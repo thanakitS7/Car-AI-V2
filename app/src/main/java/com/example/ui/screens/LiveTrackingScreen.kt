@@ -35,8 +35,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.input.ImeAction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import org.json.JSONArray
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -1700,12 +1713,26 @@ fun SummaryStatCard(
     }
 }
 
+data class OnlineSearchResult(
+    val title: String,
+    val subtitle: String,
+    val lat: Double,
+    val lng: Double
+)
+
 @Composable
 fun GoogleLocationSearchDialog(
     onDismiss: () -> Unit,
     onSelectLocation: (String, Double, Double) -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var searchQuery by remember { mutableStateOf("") }
+    var isSearching by remember { mutableStateOf(false) }
+    var onlineResults by remember { mutableStateOf<List<OnlineSearchResult>>(emptyList()) }
+    var hasSearched by remember { mutableStateOf(false) }
+
     val popularLocations = listOf(
         Triple("✈️ สนามบินสุวรรณภูมิ (Bangkok BKK)", 13.6900, 100.7500),
         Triple("🏢 คลังสินค้า ICD ลาดกระบัง", 13.7292, 100.6782),
@@ -1716,8 +1743,50 @@ fun GoogleLocationSearchDialog(
         Triple("🏙️ ดอนเมือง / ถ.วิภาวดีรังสิต", 13.9130, 100.6010)
     )
 
-    val filteredLocations = popularLocations.filter {
-        it.first.contains(searchQuery, ignoreCase = true)
+    fun performSearch() {
+        if (searchQuery.isBlank()) return
+        isSearching = true
+        hasSearched = true
+        coroutineScope.launch {
+            val query = searchQuery.trim()
+            val list = mutableListOf<OnlineSearchResult>()
+            try {
+                withContext(Dispatchers.IO) {
+                    val encoded = URLEncoder.encode(query, "UTF-8")
+                    val urlString = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded&addressdetails=1&limit=10"
+                    val url = URL(urlString)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.setRequestProperty("User-Agent", "PostCarTrack/1.0")
+                    conn.connectTimeout = 6000
+                    conn.readTimeout = 6000
+
+                    if (conn.responseCode == 200) {
+                        val responseText = conn.inputStream.bufferedReader().use { it.readText() }
+                        val jsonArray = JSONArray(responseText)
+                        for (i in 0 until jsonArray.length()) {
+                            val obj = jsonArray.getJSONObject(i)
+                            val rawName = obj.optString("display_name", "")
+                            val latVal = obj.optString("lat", "0").toDoubleOrNull() ?: 0.0
+                            val lngVal = obj.optString("lon", "0").toDoubleOrNull() ?: 0.0
+
+                            val parts = rawName.split(",")
+                            val title = parts.firstOrNull()?.trim() ?: query
+                            val subtitle = if (parts.size > 1) parts.drop(1).take(3).joinToString(", ").trim() else rawName
+
+                            if (latVal != 0.0 && lngVal != 0.0) {
+                                list.add(OnlineSearchResult(title, subtitle, latVal, lngVal))
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                onlineResults = list
+                isSearching = false
+            }
+        }
     }
 
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
@@ -1726,7 +1795,7 @@ fun GoogleLocationSearchDialog(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(8.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -1747,7 +1816,7 @@ fun GoogleLocationSearchDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "ค้นหาสถานที่ใน Google Maps",
+                            text = "ค้นหาสถานที่จริง (Google Maps)",
                             color = Color.White,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
@@ -1760,67 +1829,192 @@ fun GoogleLocationSearchDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("พิมพ์ชื่อสถานที่/ถนน/อำเภอ...", color = Color.Gray, fontSize = 13.sp) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFEF4444)) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFEF4444),
-                        unfocusedBorderColor = Color(0xFF334155),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(14.dp),
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = {
+                            searchQuery = it
+                            if (it.isBlank()) {
+                                hasSearched = false
+                                onlineResults = emptyList()
+                            }
+                        },
+                        placeholder = { Text("ค้นหาทุกสถานที่... (เช่น สยาม, เชียงใหม่)", color = Color.Gray, fontSize = 12.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFEF4444)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { performSearch() }),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFEF4444),
+                            unfocusedBorderColor = Color(0xFF334155),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Button(
+                        onClick = { performSearch() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.height(52.dp)
+                    ) {
+                        Text("ค้นหา", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // External Google Maps App Launcher
+                Button(
+                    onClick = {
+                        val queryToOpen = if (searchQuery.isNotBlank()) searchQuery else "ประเทศไทย"
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://www.google.com/maps/search/?api=1&query=${URLEncoder.encode(queryToOpen, "UTF-8")}")
+                        )
+                        context.startActivity(intent)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("🗺️ เปิดค้นหาบนแอป Google Maps โดยตรง", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Text(
-                    text = "สถานที่ยอดนิยมสำหรับขนส่ง / เดินทาง:",
-                    color = Color.LightGray,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                if (isSearching) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp)
+                    ) {
+                        CircularProgressIndicator(color = Color(0xFFEF4444), modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("กำลังค้นหาข้อมูลพิกัดสถานที่จริง...", color = Color.LightGray, fontSize = 13.sp)
+                    }
+                } else if (hasSearched && onlineResults.isEmpty()) {
+                    Text(
+                        text = "❌ ไม่พบสถานที่ดังกล่าว ลองค้นด้วยคำค้นอื่น หรือกดปุ่มเปิดแอป Google Maps ด้านบน",
+                        color = Color(0xFFF87171),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
+                } else if (onlineResults.isNotEmpty()) {
+                    Text(
+                        text = "📍 ผลการค้นหาสถานที่จริง (${onlineResults.size} รายการ):",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    filteredLocations.forEach { (name, lat, lng) ->
-                        Surface(
-                            onClick = { onSelectLocation(name, lat, lng) },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF334155),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                    ) {
+                        items(onlineResults) { item ->
+                            Surface(
+                                onClick = { onSelectLocation(item.title, item.lat, item.lng) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF334155),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = null,
-                                    tint = Color(0xFFEF4444),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = name,
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Text(
-                                        text = "พิกัด GPS: ${String.format("%.4f", lat)}, ${String.format("%.4f", lng)}",
-                                        color = Color.LightGray,
-                                        fontSize = 10.sp
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = item.title,
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = item.subtitle,
+                                            color = Color.LightGray,
+                                            fontSize = 11.sp,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = "พิกัด: ${String.format("%.4f", item.lat)}, ${String.format("%.4f", item.lng)}",
+                                            color = Color(0xFF38BDF8),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Popular preset locations when search query is empty
+                    Text(
+                        text = "สถานที่ยอดนิยมสำหรับขนส่ง / เดินทาง:",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        popularLocations.forEach { (name, lat, lng) ->
+                            Surface(
+                                onClick = { onSelectLocation(name, lat, lng) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF334155),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(18.dp)
                                     )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = name,
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "พิกัด GPS: ${String.format("%.4f", lat)}, ${String.format("%.4f", lng)}",
+                                            color = Color.LightGray,
+                                            fontSize = 10.sp
+                                        )
+                                    }
                                 }
                             }
                         }
