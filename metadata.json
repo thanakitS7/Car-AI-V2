@@ -1,0 +1,6 @@
+{
+  "name": "AutoGuard GPS - ติดตามรถยนต์",
+  "description": "ระบบติดตามรถยนต์แบบเรียลไทม์ พร้อมระบบแจ้งเตือนเมื่อรถเคลื่อนที่ออกนอกเส้นทางที่กำหนด (Real-time GPS Tracking & Geofence Alert)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
