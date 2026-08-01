@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "AutoGuard GPS"
+rootProject.name = "PostCarTrack"
 
 include(":app")

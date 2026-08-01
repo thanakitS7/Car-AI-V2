@@ -536,6 +536,67 @@ fun LiveTrackingScreen(
                     onUpdateGoogleSheetsUrl = { viewModel.updateGoogleSheetsUrl(it) },
                     onShowSensorInfo = { showSensorInfoDialog = true }
                 )
+            } else {
+                Card(
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xF21E293B)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(CyberCyanPrimary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DirectionsCar,
+                                contentDescription = "No vehicle",
+                                tint = CyberCyanPrimary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "ยังไม่มีข้อมูลรถในระบบ",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = "กรุณาเพิ่มชื่อและเลขทะเบียนรถของคุณเพื่อเริ่มใช้ระบบติดตาม GPS",
+                            color = Color.LightGray,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = { showAddVehicleDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberCyanPrimary, contentColor = Color.Black),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.height(46.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add vehicle", modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("➕ เพิ่มรถคันแรกของคุณ", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                }
             }
         }
 
@@ -552,14 +613,6 @@ fun LiveTrackingScreen(
 
         if (showSensorInfoDialog) {
             SensorInfoDialog(onDismiss = { showSensorInfoDialog = false })
-        }
-
-        if (showSpeedLimitDialog) {
-            SpeedLimitDialog(
-                currentLimit = speedLimitKmh,
-                onDismiss = { showSpeedLimitDialog = false },
-                onConfirm = { viewModel.setSpeedLimitKmh(it) }
-            )
         }
 
         tripSummary?.let { summary ->
@@ -817,7 +870,6 @@ fun VehicleTelemetryCard(
 ) {
     var isExpanded by remember { mutableStateOf(true) }
     var showUrlEditDialog by remember { mutableStateOf(false) }
-    var showSpeedLimitDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val distKm = tripDistanceMeters / 1000.0
@@ -1015,17 +1067,15 @@ fun VehicleTelemetryCard(
                             modifier = Modifier.weight(1f)
                         )
 
-                        // Speed Limit Tile (Configurable)
-                        Box(modifier = Modifier.weight(1f).clickable { showSpeedLimitDialog = true }) {
-                            TelemetryTile(
-                                title = "จำกัดความเร็ว ⚙️",
-                                value = "$speedLimitKmh",
-                                unit = "กม./ชม. (แตะแก้)",
-                                icon = Icons.Default.Warning,
-                                accentColor = CrimsonAlert,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                        // Speed Limit Tile (Fixed 90 km/h)
+                        TelemetryTile(
+                            title = "จำกัดความเร็ว",
+                            value = "90",
+                            unit = "กม./ชม. (กำหนดไว้ 90)",
+                            icon = Icons.Default.Warning,
+                            accentColor = CrimsonAlert,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
 
                     Row(

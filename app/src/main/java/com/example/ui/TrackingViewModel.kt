@@ -176,7 +176,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
     private var lastSyncTimeMs = 0L
 
     fun setSpeedLimitKmh(limit: Int) {
-        _speedLimitKmh.value = limit.coerceIn(30, 200)
+        _speedLimitKmh.value = 90
     }
 
     private fun checkAndHandleOverspeed(vehicle: VehicleEntity, speedKmh: Int, lat: Double, lng: Double) {

@@ -119,102 +119,57 @@ fun AlertLogScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Speed Limit Control Panel Card
+        // Fixed Speed Limit Control Panel Card
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Speed,
-                            contentDescription = "Speed Limit",
-                            tint = CrimsonAlert,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "กำหนดขีดจำกัดความเร็วสูงสุด",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "หากรถขับเกินค่านี้ ระบบจะแจ้งเตือนและส่ง Google Sheets สด",
-                                color = Color.LightGray,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = CrimsonAlert
-                    ) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = "Speed Limit",
+                        tint = CrimsonAlert,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
                         Text(
-                            text = "$speedLimitKmh กม./ชม.",
+                            text = "ขีดจำกัดความเร็วคงที่ 90 กม./ชม.",
                             color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "ตามกฎหมายกำหนด (ตรวจจับและแจ้งเตือนอัตโนมัติ)",
+                            color = Color.LightGray,
+                            fontSize = 11.sp
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Slider
-                Text(
-                    text = "ปรับตั้งค่าความเร็ว: $speedLimitKmh กม./ชม.",
-                    color = Color.LightGray,
-                    fontSize = 11.sp
-                )
-                Slider(
-                    value = speedLimitKmh.toFloat(),
-                    onValueChange = { viewModel.setSpeedLimitKmh(it.toInt()) },
-                    valueRange = 40f..150f,
-                    steps = 21,
-                    colors = SliderDefaults.colors(
-                        thumbColor = CrimsonAlert,
-                        activeTrackColor = CrimsonAlert,
-                        inactiveTrackColor = Color.Gray.copy(alpha = 0.4f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Quick Preset Buttons Row
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = CrimsonAlert
                 ) {
-                    val presets = listOf(60, 80, 90, 110, 120)
-                    presets.forEach { speed ->
-                        val isSelected = speedLimitKmh == speed
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) CrimsonAlert else Color(0xFF334155),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { viewModel.setSpeedLimitKmh(speed) }
-                        ) {
-                            Text(
-                                text = "$speed",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
+                    Text(
+                        text = "90 กม./ชม.",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
                 }
             }
         }
