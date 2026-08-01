@@ -57,6 +57,9 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
@@ -122,6 +125,8 @@ fun LiveTrackingScreen(
     val waypoints by viewModel.activeWaypoints.collectAsState()
     val historyPoints by viewModel.activeHistoryPoints.collectAsState()
     val isTripActive by viewModel.isTripActive.collectAsState()
+    val isTripPaused by viewModel.isTripPaused.collectAsState()
+    val tripSummary by viewModel.tripSummary.collectAsState()
     val isSimulating by viewModel.isSimulating.collectAsState()
     val isDeviatedTestMode by viewModel.isDeviatedTestMode.collectAsState()
     val simSpeedMultiplier by viewModel.simulationSpeedMultiplier.collectAsState()
@@ -379,18 +384,18 @@ fun LiveTrackingScreen(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(CircleShape)
-                                        .background(if (isTripActive) EmeraldSafe else Color.Gray)
+                                        .background(if (isTripActive && !isTripPaused) EmeraldSafe else if (isTripPaused) AmberWarning else Color.Gray)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (isTripActive) "🟢 กำลังเดินทาง (ส่งพิกัดสด)" else "⏸ ยังไม่ได้เริ่มเดินทาง",
-                                    color = if (isTripActive) EmeraldSafe else Color.LightGray,
+                                    text = if (isTripActive && !isTripPaused) "🟢 กำลังเดินทาง (ส่งพิกัดสด)" else if (isTripActive && isTripPaused) "⏸️ พักรถอยู่ (พักการทำงาน GPS)" else "⏹ ยังไม่ได้เริ่มเดินทาง",
+                                    color = if (isTripActive && !isTripPaused) EmeraldSafe else if (isTripPaused) AmberWarning else Color.LightGray,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                             Text(
-                                text = if (isTripActive) "ระบบซิงค์ข้อมูลเข้า Google Sheets สดอัตโนมัติ" else "กด 'เริ่มเดินทาง' เมื่อเริ่มออกวิ่งงาน",
+                                text = if (isTripActive && !isTripPaused) "ระบบซิงค์ข้อมูลเข้า Google Sheets สดอัตโนมัติ" else if (isTripPaused) "กด 'เดินทางต่อ' เพื่อเริ่มรับส่งพิกัด GPS อีกครั้ง" else "กด 'เริ่มเดินทาง' เมื่อเริ่มออกวิ่งงาน",
                                 color = Color.Gray,
                                 fontSize = 10.sp
                             )
@@ -413,18 +418,34 @@ fun LiveTrackingScreen(
                                 Text("เริ่มเดินทาง", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         } else {
-                            Button(
-                                onClick = {
-                                    viewModel.endTrip()
-                                    Toast.makeText(context, "🏁 ถึงเป้าหมายเรียบร้อย! หยุดส่งพิกัดแล้ว", Toast.LENGTH_SHORT).show()
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = CrimsonAlert, contentColor = Color.White),
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = "Arrived", modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("ถึงเป้าหมาย", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Button(
+                                    onClick = { viewModel.pauseTrip() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isTripPaused) AmberWarning else Color(0xFF334155),
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(if (isTripPaused) Icons.Default.PlayArrow else Icons.Default.Pause, contentDescription = "Pause", modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(if (isTripPaused) "เดินทางต่อ" else "พักรถ", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
+
+                                Button(
+                                    onClick = {
+                                        viewModel.endTrip()
+                                        Toast.makeText(context, "🏁 ถึงเป้าหมายเรียบร้อย! สรุปการเดินทาง", Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonAlert, contentColor = Color.White),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = "Arrived", modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text("ถึงเป้าหมาย", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
                             }
                         }
                     }
@@ -503,11 +524,13 @@ fun LiveTrackingScreen(
                 VehicleTelemetryCard(
                     vehicle = currentVehicle,
                     isTripActive = isTripActive,
+                    isTripPaused = isTripPaused,
                     tripDistanceMeters = tripDistanceMeters,
                     speedLimitKmh = speedLimitKmh,
                     googleSheetsUrl = googleSheetsUrl,
                     lastSyncStatus = lastSyncStatus,
                     onStartTrip = { viewModel.startTrip() },
+                    onPauseTrip = { viewModel.pauseTrip() },
                     onEndTrip = { viewModel.endTrip() },
                     onSetSpeedLimit = { viewModel.setSpeedLimitKmh(it) },
                     onUpdateGoogleSheetsUrl = { viewModel.updateGoogleSheetsUrl(it) },
@@ -536,6 +559,13 @@ fun LiveTrackingScreen(
                 currentLimit = speedLimitKmh,
                 onDismiss = { showSpeedLimitDialog = false },
                 onConfirm = { viewModel.setSpeedLimitKmh(it) }
+            )
+        }
+
+        tripSummary?.let { summary ->
+            TripSummaryDialog(
+                summary = summary,
+                onDismiss = { viewModel.dismissTripSummary() }
             )
         }
     }
@@ -773,11 +803,13 @@ fun OutofRouteAlertBanner(
 fun VehicleTelemetryCard(
     vehicle: VehicleEntity,
     isTripActive: Boolean,
+    isTripPaused: Boolean,
     tripDistanceMeters: Double,
     speedLimitKmh: Int,
     googleSheetsUrl: String,
     lastSyncStatus: String,
     onStartTrip: () -> Unit,
+    onPauseTrip: () -> Unit,
     onEndTrip: () -> Unit,
     onSetSpeedLimit: (Int) -> Unit,
     onUpdateGoogleSheetsUrl: (String) -> Unit,
@@ -880,45 +912,63 @@ fun VehicleTelemetryCard(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Driver Trip Control Buttons (เริ่มเดินทาง / ถึงเป้าหมาย)
+                // Driver Trip Control Buttons (เริ่มเดินทาง / พักรถ / ถึงเป้าหมาย)
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 2.dp)
                 ) {
-                    Button(
-                        onClick = onStartTrip,
-                        enabled = !isTripActive,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (!isTripActive) EmeraldSafe else EmeraldSafe.copy(alpha = 0.25f),
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Start Trip", modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("🚀 เริ่มเดินทาง", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    }
+                    if (!isTripActive) {
+                        Button(
+                            onClick = onStartTrip,
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldSafe, contentColor = Color.Black),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Start Trip", modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("🚀 เริ่มเดินทาง", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    } else {
+                        Button(
+                            onClick = onPauseTrip,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isTripPaused) AmberWarning else Color(0xFF334155),
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isTripPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                contentDescription = "Pause/Resume",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isTripPaused) "▶️ เดินทางต่อ" else "⏸️ พักรถ",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
 
-                    Button(
-                        onClick = onEndTrip,
-                        enabled = isTripActive,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isTripActive) CrimsonAlert else CrimsonAlert.copy(alpha = 0.25f),
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                    ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "Arrived", modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("🏁 ถึงเป้าหมาย", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Button(
+                            onClick = onEndTrip,
+                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonAlert, contentColor = Color.White),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = "Arrived", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("🏁 ถึงเป้าหมาย", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
 
@@ -1373,4 +1423,165 @@ fun SensorInfoDialog(onDismiss: () -> Unit) {
             }
         }
     )
+}
+
+@Composable
+fun TripSummaryDialog(
+    summary: com.example.ui.TripSummaryData,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            border = BorderStroke(1.5.dp, CyberCyanPrimary),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(EmeraldSafe.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("🏁", fontSize = 28.sp)
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "สรุปผลการเดินทาง",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+
+                Text(
+                    text = "ยานพาหนะ: ${summary.vehicleName} (${summary.licensePlate})",
+                    color = CyberCyanPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF1E293B),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.LocationOn, contentDescription = "Start", tint = EmeraldSafe, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "จุดเริ่มต้น: ", color = Color.Gray, fontSize = 12.sp)
+                            Text(text = summary.startPlace, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = "End", tint = CrimsonAlert, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "ถึงเป้าหมาย: ", color = Color.Gray, fontSize = 12.sp)
+                            Text(text = summary.endPlace, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val distStr = if (summary.distanceKm >= 1.0) String.format("%.2f กม.", summary.distanceKm) else String.format("%.0f เมตร", summary.distanceKm * 1000)
+                    SummaryStatCard(
+                        title = "ระยะทางรวม",
+                        value = distStr,
+                        icon = "🛣️",
+                        accentColor = CyberCyanPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    val durationStr = "${summary.durationMinutes} นาที ${summary.durationSeconds} วินาที"
+                    SummaryStatCard(
+                        title = "ระยะเวลา",
+                        value = durationStr,
+                        icon = "⏱️",
+                        accentColor = AmberWarning,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    SummaryStatCard(
+                        title = "ความเร็วสูงสุด",
+                        value = "${summary.topSpeedKmh} กม./ชม.",
+                        icon = "🏎️",
+                        accentColor = Color(0xFFA855F7),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    SummaryStatCard(
+                        title = "ขับเกินความเร็ว",
+                        value = "${summary.overspeedCount} ครั้ง",
+                        icon = if (summary.overspeedCount > 0) "⚠️" else "✅",
+                        accentColor = if (summary.overspeedCount > 0) CrimsonAlert else EmeraldSafe,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldSafe, contentColor = Color.Black),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Text("ตกลง / ปิดหน้าต่างสรุป", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SummaryStatCard(
+    title: String,
+    value: String,
+    icon: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFF1E293B),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.3f)),
+        modifier = modifier
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(icon, fontSize = 14.sp)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(title, color = Color.Gray, fontSize = 10.sp)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(value, color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
 }

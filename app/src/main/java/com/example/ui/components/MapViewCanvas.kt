@@ -226,7 +226,7 @@ fun MapViewCanvas(
                 )
             }
 
-            // 6. Draw Vehicle Position Pin & Blue Navigation Dot (Google Maps Pin)
+            // 6. Draw Vehicle Position (Car Icon & Blue Pulse)
             if (vehicle != null) {
                 val carPos = latLngToOffset(vehicle.currentLat, vehicle.currentLng)
 
@@ -237,70 +237,78 @@ fun MapViewCanvas(
                     center = carPos
                 )
 
-                // Direction Beam (Blue Direction Cone)
+                // Top-Down Rotating Car Icon
                 rotate(degrees = vehicle.headingBearing, pivot = carPos) {
-                    val conePath = Path().apply {
-                        moveTo(carPos.x, carPos.y)
-                        lineTo(carPos.x - 20.dp.toPx(), carPos.y - 45.dp.toPx())
-                        lineTo(carPos.x + 20.dp.toPx(), carPos.y - 45.dp.toPx())
-                        close()
-                    }
-                    drawPath(
-                        path = conePath,
-                        color = Color(0xFF4285F4).copy(alpha = 0.25f)
+                    // Car Shadow
+                    drawRoundRect(
+                        color = Color.Black.copy(alpha = 0.35f),
+                        topLeft = Offset(carPos.x - 14.dp.toPx(), carPos.y - 24.dp.toPx() + 3.dp.toPx()),
+                        size = Size(28.dp.toPx(), 48.dp.toPx()),
+                        cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+                    )
+                    // Main Car Body (Sporty Cyan)
+                    drawRoundRect(
+                        color = Color(0xFF0284C7),
+                        topLeft = Offset(carPos.x - 14.dp.toPx(), carPos.y - 24.dp.toPx()),
+                        size = Size(28.dp.toPx(), 48.dp.toPx()),
+                        cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+                    )
+                    // Roof Dark Glass
+                    drawRoundRect(
+                        color = Color(0xFF0F172A),
+                        topLeft = Offset(carPos.x - 10.dp.toPx(), carPos.y - 14.dp.toPx()),
+                        size = Size(20.dp.toPx(), 24.dp.toPx()),
+                        cornerRadius = CornerRadius(5.dp.toPx(), 5.dp.toPx())
+                    )
+                    // Front Windshield
+                    drawRoundRect(
+                        color = Color(0xFF38BDF8),
+                        topLeft = Offset(carPos.x - 9.dp.toPx(), carPos.y - 12.dp.toPx()),
+                        size = Size(18.dp.toPx(), 7.dp.toPx()),
+                        cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
+                    )
+                    // Rear Glass
+                    drawRoundRect(
+                        color = Color(0xFF38BDF8),
+                        topLeft = Offset(carPos.x - 8.dp.toPx(), carPos.y + 4.dp.toPx()),
+                        size = Size(16.dp.toPx(), 4.dp.toPx()),
+                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                    )
+                    // Headlights (Yellow Glow)
+                    drawCircle(
+                        color = Color(0xFFFEF08A),
+                        radius = 3.5.dp.toPx(),
+                        center = Offset(carPos.x - 9.dp.toPx(), carPos.y - 22.dp.toPx())
+                    )
+                    drawCircle(
+                        color = Color(0xFFFEF08A),
+                        radius = 3.5.dp.toPx(),
+                        center = Offset(carPos.x + 9.dp.toPx(), carPos.y - 22.dp.toPx())
+                    )
+                    // Taillights (Red)
+                    drawRoundRect(
+                        color = Color(0xFFEF4444),
+                        topLeft = Offset(carPos.x - 11.dp.toPx(), carPos.y + 21.dp.toPx()),
+                        size = Size(6.dp.toPx(), 3.dp.toPx()),
+                        cornerRadius = CornerRadius(1.dp.toPx(), 1.dp.toPx())
+                    )
+                    drawRoundRect(
+                        color = Color(0xFFEF4444),
+                        topLeft = Offset(carPos.x + 5.dp.toPx(), carPos.y + 21.dp.toPx()),
+                        size = Size(6.dp.toPx(), 3.dp.toPx()),
+                        cornerRadius = CornerRadius(1.dp.toPx(), 1.dp.toPx())
                     )
                 }
 
-                // Red Google Maps Teardrop Location Pin
-                val pinWidth = 28.dp.toPx()
-                val pinHeight = 38.dp.toPx()
-                val pinTop = carPos.y - pinHeight
-                val pinLeft = carPos.x - (pinWidth / 2f)
-
-                // Shadow under Pin
-                drawOval(
-                    color = Color.Black.copy(alpha = 0.25f),
-                    topLeft = Offset(carPos.x - 10.dp.toPx(), carPos.y - 3.dp.toPx()),
-                    size = Size(20.dp.toPx(), 8.dp.toPx())
-                )
-
-                // Teardrop Shape
-                val pinPath = Path().apply {
-                    moveTo(carPos.x, carPos.y) // Tip pointing to GPS location
-                    cubicTo(
-                        carPos.x - (pinWidth / 2f), carPos.y - (pinHeight * 0.4f),
-                        carPos.x - (pinWidth / 2f), pinTop,
-                        carPos.x, pinTop
-                    )
-                    cubicTo(
-                        carPos.x + (pinWidth / 2f), pinTop,
-                        carPos.x + (pinWidth / 2f), carPos.y - (pinHeight * 0.4f),
-                        carPos.x, carPos.y
-                    )
-                    close()
-                }
-
-                drawPath(
-                    path = pinPath,
-                    color = Color(0xFFEA4335) // Google Maps Pin Red
-                )
-
-                // White Inner Circle in Pin
-                drawCircle(
-                    color = Color.White,
-                    radius = 5.5.dp.toPx(),
-                    center = Offset(carPos.x, pinTop + (pinHeight * 0.35f))
-                )
-
-                // Vehicle License Plate Tag above Pin
-                val labelText = "${vehicle.licensePlate} (${vehicle.speedKmh} กม./ชม.)"
+                // Vehicle License Plate Tag above Car Icon
+                val labelText = "🚘 ${vehicle.licensePlate} (${vehicle.speedKmh} กม./ชม.)"
                 val tagTextResult = textMeasurer.measure(
                     text = labelText,
                     style = TextStyle(color = Color(0xFF202124), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 )
 
                 val tagX = carPos.x - (tagTextResult.size.width / 2f)
-                val tagY = pinTop - 26.dp.toPx()
+                val tagY = carPos.y - 42.dp.toPx()
 
                 // White Callout Pill Card
                 drawRoundRect(

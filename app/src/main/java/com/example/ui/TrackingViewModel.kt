@@ -152,6 +152,16 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
     private val _tripDistanceMeters = MutableStateFlow(0.0)
     val tripDistanceMeters: StateFlow<Double> = _tripDistanceMeters.asStateFlow()
 
+    private val _isTripPaused = MutableStateFlow(false)
+    val isTripPaused: StateFlow<Boolean> = _isTripPaused.asStateFlow()
+
+    private val _tripStartTimeMs = MutableStateFlow(0L)
+    private val _tripTopSpeedKmh = MutableStateFlow(0)
+    private val _tripOverspeedCount = MutableStateFlow(0)
+
+    private val _tripSummary = MutableStateFlow<TripSummaryData?>(null)
+    val tripSummary: StateFlow<TripSummaryData?> = _tripSummary.asStateFlow()
+
     private val _speedLimitKmh = MutableStateFlow(90)
     val speedLimitKmh: StateFlow<Int> = _speedLimitKmh.asStateFlow()
 
@@ -170,11 +180,16 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun checkAndHandleOverspeed(vehicle: VehicleEntity, speedKmh: Int, lat: Double, lng: Double) {
+        if (speedKmh > _tripTopSpeedKmh.value) {
+            _tripTopSpeedKmh.value = speedKmh
+        }
+
         val limit = _speedLimitKmh.value
         val isExceeded = speedKmh > limit
         _isOverspeeding.value = isExceeded
 
         if (isExceeded) {
+            _tripOverspeedCount.value += 1
             val now = System.currentTimeMillis()
             if (now - lastOverspeedAlertTimeMs > 10000L) {
                 lastOverspeedAlertTimeMs = now
@@ -231,6 +246,11 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         _currentGpsAccuracy.value = accuracy
 
         val vehicle = activeVehicle.value ?: return
+
+        // If trip is paused, do not update movement telemetry
+        if (_isTripPaused.value) {
+            return
+        }
 
         checkAndHandleOverspeed(vehicle, speedKmh, lat, lng)
 
@@ -292,7 +312,13 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
 
     fun startTrip() {
         _isTripActive.value = true
+        _isTripPaused.value = false
+        _tripStartTimeMs.value = System.currentTimeMillis()
         _tripDistanceMeters.value = 0.0
+        _tripTopSpeedKmh.value = 0
+        _tripOverspeedCount.value = 0
+        _tripSummary.value = null
+
         val vehicle = activeVehicle.value
         if (vehicle != null) {
             lastGpsLat = vehicle.currentLat
@@ -322,12 +348,71 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun pauseTrip() {
+        val newPausedState = !_isTripPaused.value
+        _isTripPaused.value = newPausedState
+
+        val vehicle = activeVehicle.value
+        if (vehicle != null) {
+            viewModelScope.launch {
+                val statusText = if (newPausedState) "⏸️ พักรถ (พักการทำงาน GPS)" else "▶️ เดินทางต่อ"
+                repository.updateVehiclePosition(
+                    vehicleId = vehicle.id,
+                    newLat = vehicle.currentLat,
+                    newLng = vehicle.currentLng,
+                    speedKmh = if (newPausedState) 0 else vehicle.speedKmh,
+                    heading = vehicle.headingBearing
+                )
+                _lastSyncStatus.value = statusText
+                if (_isGoogleSheetsSyncEnabled.value) {
+                    com.example.util.GoogleSheetsSyncManager.sendTelemetryToGoogleSheets(
+                        webhookUrl = _googleSheetsUrl.value,
+                        vehicleId = vehicle.id,
+                        vehicleName = vehicle.name,
+                        licensePlate = vehicle.licensePlate,
+                        status = statusText,
+                        latitude = vehicle.currentLat,
+                        longitude = vehicle.currentLng,
+                        speedKmh = if (newPausedState) 0 else vehicle.speedKmh,
+                        fuelPercent = vehicle.fuelPercent,
+                        batteryVoltage = vehicle.batteryVoltage
+                    )
+                }
+            }
+        }
+    }
+
     fun endTrip() {
+        val vehicle = activeVehicle.value
+        val startTime = if (_tripStartTimeMs.value > 0L) _tripStartTimeMs.value else System.currentTimeMillis() - 600000L
+        val durationMs = (System.currentTimeMillis() - startTime).coerceAtLeast(1000L)
+        val totalSecs = durationMs / 1000L
+        val mins = totalSecs / 60L
+        val secs = totalSecs % 60L
+
+        if (vehicle != null) {
+            val context = getApplication<Application>().applicationContext
+            val startLoc = GeoUtils.getFallbackThaiLandmark(lastGpsLat.takeIf { it != 0.0 } ?: vehicle.currentLat, lastGpsLng.takeIf { it != 0.0 } ?: vehicle.currentLng)
+            val endLoc = GeoUtils.getFallbackThaiLandmark(vehicle.currentLat, vehicle.currentLng)
+
+            _tripSummary.value = TripSummaryData(
+                vehicleName = vehicle.name,
+                licensePlate = vehicle.licensePlate,
+                distanceKm = _tripDistanceMeters.value / 1000.0,
+                durationMinutes = mins,
+                durationSeconds = secs,
+                topSpeedKmh = _tripTopSpeedKmh.value.coerceAtLeast(vehicle.speedKmh),
+                startPlace = startLoc,
+                endPlace = endLoc,
+                overspeedCount = _tripOverspeedCount.value
+            )
+        }
+
         _isTripActive.value = false
+        _isTripPaused.value = false
         _isSimulating.value = false
         simulationJob?.cancel()
 
-        val vehicle = activeVehicle.value
         if (vehicle != null) {
             viewModelScope.launch {
                 repository.updateVehiclePosition(
@@ -337,7 +422,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                     speedKmh = 0,
                     heading = vehicle.headingBearing
                 )
-                _lastSyncStatus.value = "ถึงที่หมายแล้ว (หยุดการส่งข้อมูล)"
+                _lastSyncStatus.value = "ถึงที่หมายแล้ว (สรุปการเดินทางเรียบร้อย)"
                 com.example.util.GoogleSheetsSyncManager.sendTelemetryToGoogleSheets(
                     webhookUrl = _googleSheetsUrl.value,
                     vehicleId = vehicle.id,
@@ -352,6 +437,10 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                 )
             }
         }
+    }
+
+    fun dismissTripSummary() {
+        _tripSummary.value = null
     }
 
     fun selectVehicle(vehicleId: String) {
@@ -578,3 +667,15 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 }
+
+data class TripSummaryData(
+    val vehicleName: String,
+    val licensePlate: String,
+    val distanceKm: Double,
+    val durationMinutes: Long,
+    val durationSeconds: Long,
+    val topSpeedKmh: Int,
+    val startPlace: String,
+    val endPlace: String,
+    val overspeedCount: Int
+)
