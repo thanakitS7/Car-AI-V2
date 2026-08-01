@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FlashOn
@@ -58,6 +59,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.PlayArrow
@@ -141,6 +143,7 @@ fun LiveTrackingScreen(
     var showAddVehicleDialog by remember { mutableStateOf(false) }
     var showSensorInfoDialog by remember { mutableStateOf(false) }
     var showSpeedLimitDialog by remember { mutableStateOf(false) }
+    var showLocationSearchDialog by remember { mutableStateOf(false) }
     var isTopPanelExpanded by remember { mutableStateOf(true) }
 
     // GPS Permission launcher
@@ -512,6 +515,56 @@ fun LiveTrackingScreen(
                     }
                 }
             }
+
+            // Unblocked Floating Google Maps Location Search Bar
+            Surface(
+                onClick = { showLocationSearchDialog = true },
+                shape = RoundedCornerShape(24.dp),
+                color = Color(0xF21E293B),
+                border = BorderStroke(1.dp, Color(0xFF334155)),
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search Google Maps",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "🔍 ค้นหาใน Google Maps (สถานที่/จุดหมาย)",
+                            color = Color.LightGray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                    }
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFFEF4444).copy(alpha = 0.2f)
+                    ) {
+                        Text(
+                            text = "GPS 🟢",
+                            color = Color(0xFFEF4444),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+            }
         }
 
         // Bottom Dashboard Card Overlay
@@ -613,6 +666,17 @@ fun LiveTrackingScreen(
 
         if (showSensorInfoDialog) {
             SensorInfoDialog(onDismiss = { showSensorInfoDialog = false })
+        }
+
+        if (showLocationSearchDialog) {
+            GoogleLocationSearchDialog(
+                onDismiss = { showLocationSearchDialog = false },
+                onSelectLocation = { name, lat, lng ->
+                    showLocationSearchDialog = false
+                    viewModel.updateRealGpsLocation(lat, lng, 0, 0f, 5f)
+                    Toast.makeText(context, "📍 ย้ายแผนที่ไปยัง $name (พิกัด $lat, $lng)", Toast.LENGTH_LONG).show()
+                }
+            )
         }
 
         tripSummary?.let { summary ->
@@ -1632,6 +1696,137 @@ fun SummaryStatCard(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(value, color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun GoogleLocationSearchDialog(
+    onDismiss: () -> Unit,
+    onSelectLocation: (String, Double, Double) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val popularLocations = listOf(
+        Triple("✈️ สนามบินสุวรรณภูมิ (Bangkok BKK)", 13.6900, 100.7500),
+        Triple("🏢 คลังสินค้า ICD ลาดกระบัง", 13.7292, 100.6782),
+        Triple("🏛️ อนุสาวรีย์ชัยสมรภูมิ กรุงเทพฯ", 13.7628, 100.5372),
+        Triple("🛣️ ด่านทางด่วนมอเตอร์เวย์ พระราม 9", 13.7420, 100.6150),
+        Triple("🚚 ถ.บางนา-ตราด กม.10", 13.6350, 100.7050),
+        Triple("🌊 นิคมอุตสาหกรรม อมตะ ชลบุรี", 13.3611, 100.9847),
+        Triple("🏙️ ดอนเมือง / ถ.วิภาวดีรังสิต", 13.9130, 100.6010)
+    )
+
+    val filteredLocations = popularLocations.filter {
+        it.first.contains(searchQuery, ignoreCase = true)
+    }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "ค้นหาสถานที่ใน Google Maps",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.LightGray)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("พิมพ์ชื่อสถานที่/ถนน/อำเภอ...", color = Color.Gray, fontSize = 13.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFEF4444)) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFFEF4444),
+                        unfocusedBorderColor = Color(0xFF334155),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "สถานที่ยอดนิยมสำหรับขนส่ง / เดินทาง:",
+                    color = Color.LightGray,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    filteredLocations.forEach { (name, lat, lng) ->
+                        Surface(
+                            onClick = { onSelectLocation(name, lat, lng) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF334155),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = Color(0xFFEF4444),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = name,
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "พิกัด GPS: ${String.format("%.4f", lat)}, ${String.format("%.4f", lng)}",
+                                        color = Color.LightGray,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
