@@ -314,59 +314,68 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Google Sheets Link Settings Row
+                        // Google Sheets Link Settings Card
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = Color(0xFF334155),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.padding(10.dp)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "🔗 Google Sheets Link Webhook",
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = if (googleSheetsUrl.isNotBlank()) googleSheetsUrl else "ยังไม่ได้ตั้งค่า Webhook URL",
-                                        color = Color.LightGray,
-                                        fontSize = 10.sp,
-                                        maxLines = 1
-                                    )
-                                }
+                                Text(
+                                    text = "🔗 Google Sheets Webhook Connection",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
 
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = if (googleSheetsUrl.isNotBlank()) googleSheetsUrl else "ยังไม่ได้ตั้งค่า Webhook URL",
+                                    color = Color.LightGray,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
                                     Button(
                                         onClick = {
                                             viewModel.syncVehiclesFromCloud { success, msg ->
-                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                             }
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
                                         shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.height(32.dp)
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(36.dp)
                                     ) {
-                                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("ดึงข้อมูล Cloud", fontSize = 10.sp)
+                                        Text("ดึงข้อมูล Cloud", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
 
                                     Button(
                                         onClick = { showGoogleSheetsUrlDialog = true },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
                                         shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.height(32.dp)
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(36.dp)
                                     ) {
-                                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("ตั้งค่า Webhook", fontSize = 10.sp)
+                                        Text("ตั้งค่า Webhook", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }

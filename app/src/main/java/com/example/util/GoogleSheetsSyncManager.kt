@@ -155,15 +155,41 @@ object GoogleSheetsSyncManager {
 
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful || response.code == 200) {
-                    val rawBody = response.body?.string() ?: ""
-                    val jsonArray = org.json.JSONArray(rawBody)
-                    val resultList = mutableListOf<JSONObject>()
-                    for (i in 0 until jsonArray.length()) {
-                        resultList.add(jsonArray.getJSONObject(i))
+                    val rawBody = response.body?.string()?.trim() ?: ""
+                    if (rawBody.startsWith("<!DOCTYPE") || rawBody.startsWith("<html")) {
+                        return@withContext Result.failure(
+                            Exception("URL Webhook ตอบกลับเป็นหน้าเว็บ HTML (กรุณาตรวจสอบการเปิดเผยแพร่ Web App เป็น 'Anyone' ใน Google Apps Script)")
+                        )
                     }
-                    Result.success(resultList)
+
+                    val resultList = mutableListOf<JSONObject>()
+                    try {
+                        if (rawBody.startsWith("[")) {
+                            val jsonArray = org.json.JSONArray(rawBody)
+                            for (i in 0 until jsonArray.length()) {
+                                resultList.add(jsonArray.getJSONObject(i))
+                            }
+                        } else if (rawBody.startsWith("{")) {
+                            val jsonObj = org.json.JSONObject(rawBody)
+                            if (jsonObj.has("vehicles")) {
+                                val arr = jsonObj.getJSONArray("vehicles")
+                                for (i in 0 until arr.length()) {
+                                    resultList.add(arr.getJSONObject(i))
+                                }
+                            } else {
+                                resultList.add(jsonObj)
+                            }
+                        } else {
+                            return@withContext Result.failure(
+                                Exception("รูปแบบตอบกลับไม่ใช่ JSON (โปรดเพิ่มฟังก์ชั่น doGet ใน Google Apps Script)")
+                            )
+                        }
+                        Result.success(resultList)
+                    } catch (jsonEx: Exception) {
+                        Result.failure(Exception("แปลงข้อมูล JSON ล้มเหลว: ${jsonEx.localizedMessage}"))
+                    }
                 } else {
-                    Result.failure(Exception("Cloud return code: ${response.code}"))
+                    Result.failure(Exception("Google Sheet คืนค่ารหัสผิดพลาด: ${response.code}"))
                 }
             }
         } catch (e: Exception) {
