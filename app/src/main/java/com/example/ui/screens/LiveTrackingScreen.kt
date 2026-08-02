@@ -72,6 +72,7 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.LocationOn
@@ -254,41 +255,50 @@ fun LiveTrackingScreen(
                 .padding(top = 8.dp)
                 .animateContentSize()
         ) {
-            // Prominent Overspeed Warning Banner
+            // Prominent Overspeed Warning Banner (Centered Underneath Bell Icon)
             if (isOverspeeding || (currentVehicle != null && currentVehicle.speedKmh > speedLimitKmh)) {
                 Surface(
                     color = CrimsonAlert,
-                    shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 8.dp,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.5f)),
+                    shadowElevation = 10.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Speed,
-                            contentDescription = "Overspeed Alert",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "🚨 เตือน! ขับรถเกินความเร็วที่กำหนด",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "ความเร็วปัจจุบัน ${currentVehicle?.speedKmh ?: 0} กม./ชม. (ขีดจำกัด $speedLimitKmh กม./ชม.)",
-                                color = Color.Yellow,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
+                        // Bell Icon in a Glowing Badge
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Color.White.copy(alpha = 0.25f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = "Bell Alert",
+                                tint = Color.White,
+                                modifier = Modifier.size(26.dp)
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Single Centered Line Warning Text
+                        Text(
+                            text = "🚨 เตือนความเร็ว",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
@@ -1067,17 +1077,27 @@ fun VehicleTelemetryCard(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            IconButton(
-                                onClick = { showDriverNameEditDialog = true },
-                                modifier = Modifier.size(20.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFF334155),
+                                onClick = {
+                                    Toast.makeText(context, "🔒 สำหรับ Admin เท่านั้น! กรุณาไปที่เมนู 'จัดการข้อมูล' เพื่อแก้ไขข้อมูลผู้ใช้รถและทะเบียนรถ", Toast.LENGTH_LONG).show()
+                                }
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit Driver Name",
-                                    tint = Color(0xFF38BDF8),
-                                    modifier = Modifier.size(14.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = "Admin Managed",
+                                        tint = Color.LightGray,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text("Admin Only", fontSize = 9.sp, color = Color.LightGray)
+                                }
                             }
                         }
                     }

@@ -172,6 +172,14 @@ class TrackingRepository(private val dao: AppDao) {
         dao.insertVehicle(vehicle)
     }
 
+    suspend fun updateVehicle(vehicle: VehicleEntity) = withContext(Dispatchers.IO) {
+        dao.updateVehicle(vehicle)
+    }
+
+    suspend fun deleteVehicle(vehicleId: String) = withContext(Dispatchers.IO) {
+        dao.deleteVehicle(vehicleId)
+    }
+
     suspend fun addRoute(route: RouteGeofenceEntity) = withContext(Dispatchers.IO) {
         dao.insertRoute(route)
     }

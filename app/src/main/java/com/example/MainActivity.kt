@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Icon
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.TrackingViewModel
+import com.example.ui.screens.AdminUserManagementScreen
 import com.example.ui.screens.AlertLogScreen
 import com.example.ui.screens.GeofenceRouteScreen
 import com.example.ui.screens.LiveTrackingScreen
@@ -103,6 +105,20 @@ fun AutoGuardApp() {
                         unselectedTextColor = Color(0xFF49454F)
                     )
                 )
+
+                NavigationBarItem(
+                    selected = selectedScreen == "ADMIN",
+                    onClick = { selectedScreen = "ADMIN" },
+                    icon = { Icon(imageVector = Icons.Default.ManageAccounts, contentDescription = "Admin") },
+                    label = { Text("จัดการข้อมูล", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.White,
+                        selectedTextColor = Color(0xFF6750A4),
+                        indicatorColor = Color(0xFF6750A4),
+                        unselectedIconColor = Color(0xFF49454F),
+                        unselectedTextColor = Color(0xFF49454F)
+                    )
+                )
             }
         }
     ) { innerPadding ->
@@ -111,6 +127,7 @@ fun AutoGuardApp() {
                 "LIVE_MAP" -> LiveTrackingScreen(viewModel = viewModel)
                 "ALERTS" -> AlertLogScreen(viewModel = viewModel)
                 "PLAYBACK" -> PlaybackScreen(viewModel = viewModel)
+                "ADMIN" -> AdminUserManagementScreen(viewModel = viewModel)
             }
         }
     }

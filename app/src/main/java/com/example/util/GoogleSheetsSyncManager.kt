@@ -139,4 +139,36 @@ object GoogleSheetsSyncManager {
             Result.failure(ex)
         }
     }
+
+    suspend fun fetchVehiclesFromCloud(webhookUrl: String): Result<List<JSONObject>> = withContext(Dispatchers.IO) {
+        val targetUrl = webhookUrl.ifBlank { DEFAULT_WEBHOOK_URL }
+        try {
+            val urlBuilder = targetUrl.toHttpUrlOrNull()?.newBuilder()
+                ?: return@withContext Result.failure(Exception("URL ไม่ถูกต้อง"))
+
+            urlBuilder.addQueryParameter("action", "getVehicles")
+
+            val request = Request.Builder()
+                .url(urlBuilder.build())
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful || response.code == 200) {
+                    val rawBody = response.body?.string() ?: ""
+                    val jsonArray = org.json.JSONArray(rawBody)
+                    val resultList = mutableListOf<JSONObject>()
+                    for (i in 0 until jsonArray.length()) {
+                        resultList.add(jsonArray.getJSONObject(i))
+                    }
+                    Result.success(resultList)
+                } else {
+                    Result.failure(Exception("Cloud return code: ${response.code}"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("GoogleSheetsSync", "Failed to fetch vehicles from cloud", e)
+            Result.failure(e)
+        }
+    }
 }

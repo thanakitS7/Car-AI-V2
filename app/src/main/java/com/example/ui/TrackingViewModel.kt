@@ -519,6 +519,91 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun updateVehicleDetails(vehicleId: String, name: String, licensePlate: String, modelYear: String, driverName: String) {
+        viewModelScope.launch {
+            val vehicles = allVehicles.value
+            val v = vehicles.firstOrNull { it.id == vehicleId } ?: return@launch
+            val updated = v.copy(
+                name = name.ifBlank { v.name },
+                licensePlate = licensePlate.ifBlank { v.licensePlate },
+                modelYear = modelYear.ifBlank { v.modelYear },
+                driverName = driverName.ifBlank { v.driverName }
+            )
+            repository.updateVehicle(updated)
+            if (_isGoogleSheetsSyncEnabled.value) {
+                com.example.util.GoogleSheetsSyncManager.sendTelemetryToGoogleSheets(
+                    webhookUrl = _googleSheetsUrl.value,
+                    vehicleId = updated.id,
+                    vehicleName = updated.name,
+                    licensePlate = updated.licensePlate,
+                    driverName = updated.driverName,
+                    status = "UPDATED (แก้ไขข้อมูลคนขับ/รถ)",
+                    latitude = updated.currentLat,
+                    longitude = updated.currentLng,
+                    speedKmh = updated.speedKmh,
+                    fuelPercent = updated.fuelPercent,
+                    batteryVoltage = updated.batteryVoltage
+                )
+            }
+        }
+    }
+
+    fun deleteVehicle(vehicleId: String) {
+        viewModelScope.launch {
+            repository.deleteVehicle(vehicleId)
+            val remaining = allVehicles.value.filter { it.id != vehicleId }
+            if (remaining.isNotEmpty()) {
+                selectVehicle(remaining.first().id)
+            }
+        }
+    }
+
+    fun syncVehiclesFromCloud(onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            val result = com.example.util.GoogleSheetsSyncManager.fetchVehiclesFromCloud(_googleSheetsUrl.value)
+            if (result.isSuccess) {
+                val list = result.getOrNull() ?: emptyList()
+                if (list.isNotEmpty()) {
+                    for (jsonObj in list) {
+                        val vId = jsonObj.optString("vehicleId")
+                        if (vId.isNotBlank()) {
+                            val name = jsonObj.optString("vehicleName", "Vehicle")
+                            val plate = jsonObj.optString("licensePlate", "-")
+                            val driver = jsonObj.optString("driverName", "Driver")
+                            val existing = allVehicles.value.firstOrNull { it.id == vId }
+                            if (existing != null) {
+                                repository.updateVehicle(existing.copy(name = name, licensePlate = plate, driverName = driver))
+                            } else {
+                                repository.addVehicle(
+                                    com.example.data.VehicleEntity(
+                                        id = vId,
+                                        name = name,
+                                        licensePlate = plate,
+                                        modelYear = "2024",
+                                        status = "STOPPED",
+                                        currentLat = 13.7563,
+                                        currentLng = 100.5018,
+                                        speedKmh = 0,
+                                        headingBearing = 0f,
+                                        fuelPercent = 100,
+                                        batteryVoltage = 12.6,
+                                        activeRouteId = null,
+                                        driverName = driver
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    onComplete(true, "ซิงค์รายชื่อรถและคนขับ ${list.size} คันจาก Google Sheets สำเร็จ!")
+                } else {
+                    onComplete(true, "ไม่มีข้อมูลใหม่จาก Google Sheets")
+                }
+            } else {
+                onComplete(false, result.exceptionOrNull()?.message ?: "ไม่สามารถดึงข้อมูลได้")
+            }
+        }
+    }
+
     fun addNewRoute(
         routeName: String,
         type: String,

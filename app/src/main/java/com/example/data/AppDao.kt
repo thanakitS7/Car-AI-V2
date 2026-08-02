@@ -26,6 +26,9 @@ interface AppDao {
     @Update
     suspend fun updateVehicle(vehicle: VehicleEntity)
 
+    @Query("DELETE FROM vehicles WHERE id = :vehicleId")
+    suspend fun deleteVehicle(vehicleId: String)
+
     // Route / Geofences
     @Query("SELECT * FROM routes_geofences WHERE vehicleId = :vehicleId")
     fun getRoutesForVehicle(vehicleId: String): Flow<List<RouteGeofenceEntity>>
