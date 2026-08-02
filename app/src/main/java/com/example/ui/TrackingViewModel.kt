@@ -565,14 +565,43 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                 val list = result.getOrNull() ?: emptyList()
                 if (list.isNotEmpty()) {
                     for (jsonObj in list) {
-                        val vId = jsonObj.optString("vehicleId")
+                        val vId = jsonObj.optString("vehicleId").ifBlank {
+                            jsonObj.optString("รหัสรถ").ifBlank { jsonObj.optString("id") }
+                        }
                         if (vId.isNotBlank()) {
-                            val name = jsonObj.optString("vehicleName", "Vehicle")
-                            val plate = jsonObj.optString("licensePlate", "-")
-                            val driver = jsonObj.optString("driverName", "Driver")
+                            val name = jsonObj.optString("vehicleName").ifBlank {
+                                jsonObj.optString("ชื่อรถ").ifBlank { jsonObj.optString("name", "Vehicle") }
+                            }
+                            val plate = jsonObj.optString("licensePlate").ifBlank {
+                                jsonObj.optString("ทะเบียนรถ").ifBlank { jsonObj.optString("plate", "-") }
+                            }
+                            val driver = jsonObj.optString("driverName").ifBlank {
+                                jsonObj.optString("ชื่อผู้ใช้/พนักงานขับรถ").ifBlank {
+                                    jsonObj.optString("พนักงานขับรถ").ifBlank {
+                                        jsonObj.optString("driver", "Driver")
+                                    }
+                                }
+                            }
+                            val status = jsonObj.optString("status").ifBlank {
+                                jsonObj.optString("สถานะ", "STOPPED")
+                            }
+                            val lat = jsonObj.optDouble("latitude", jsonObj.optDouble("ละติจูด", jsonObj.optDouble("lat", 13.7563)))
+                            val lng = jsonObj.optDouble("longitude", jsonObj.optDouble("ลองจิจูด", jsonObj.optDouble("lng", 100.5018)))
+                            val speed = jsonObj.optInt("speedKmh", jsonObj.optInt("ความเร็ว", jsonObj.optInt("speed", 0)))
+
                             val existing = allVehicles.value.firstOrNull { it.id == vId }
                             if (existing != null) {
-                                repository.updateVehicle(existing.copy(name = name, licensePlate = plate, driverName = driver))
+                                repository.updateVehicle(
+                                    existing.copy(
+                                        name = name,
+                                        licensePlate = plate,
+                                        driverName = driver,
+                                        status = status,
+                                        currentLat = if (lat != 0.0) lat else existing.currentLat,
+                                        currentLng = if (lng != 0.0) lng else existing.currentLng,
+                                        speedKmh = speed
+                                    )
+                                )
                             } else {
                                 repository.addVehicle(
                                     com.example.data.VehicleEntity(
@@ -580,10 +609,10 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                                         name = name,
                                         licensePlate = plate,
                                         modelYear = "2024",
-                                        status = "STOPPED",
-                                        currentLat = 13.7563,
-                                        currentLng = 100.5018,
-                                        speedKmh = 0,
+                                        status = status,
+                                        currentLat = if (lat != 0.0) lat else 13.7563,
+                                        currentLng = if (lng != 0.0) lng else 100.5018,
+                                        speedKmh = speed,
                                         headingBearing = 0f,
                                         fuelPercent = 100,
                                         batteryVoltage = 12.6,

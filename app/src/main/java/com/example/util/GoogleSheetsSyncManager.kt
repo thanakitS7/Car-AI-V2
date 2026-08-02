@@ -24,7 +24,7 @@ object GoogleSheetsSyncManager {
         .followSslRedirects(true)
         .build()
 
-    const val DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzdZ539qcXHrTY66hrdjXBeecYVH3Q14-3tBwQBerIEzabPDPFiJEwv47nHDYYIzTZj/exec"
+    const val DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzvT5UfAPvdeTNdBatWzbaIcnRYTW0ya076B_jD74ReMqUzx2Y-UwuEWaoIPdDPkXRZ/exec"
 
     suspend fun sendTelemetryToGoogleSheets(
         webhookUrl: String,
@@ -43,18 +43,40 @@ object GoogleSheetsSyncManager {
         val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 
         try {
-            // Build JSON payload
+            // Build JSON payload with both English and Thai key aliases for max compatibility
             val jsonPayload = JSONObject().apply {
                 put("timestamp", timeStr)
+                put("วันเวลา", timeStr)
+
                 put("vehicleId", vehicleId)
+                put("รหัสรถ", vehicleId)
+
                 put("vehicleName", vehicleName)
+                put("ชื่อรถ", vehicleName)
+
                 put("licensePlate", licensePlate)
+                put("ทะเบียนรถ", licensePlate)
+
                 put("driverName", driverName)
                 put("driver", driverName)
+                put("พนักงานขับรถ", driverName)
+                put("ชื่อผู้ใช้/พนักงานขับรถ", driverName)
+
                 put("status", status)
-                put("latitude", latitude)
-                put("longitude", longitude)
+                put("สถานะ", status)
+
                 put("speedKmh", speedKmh)
+                put("speed", speedKmh)
+                put("ความเร็ว", speedKmh)
+
+                put("latitude", latitude)
+                put("lat", latitude)
+                put("ละติจูด", latitude)
+
+                put("longitude", longitude)
+                put("lng", longitude)
+                put("ลองจิจูด", longitude)
+
                 put("fuelPercent", fuelPercent)
                 put("batteryVoltage", batteryVoltage)
             }.toString()
@@ -110,15 +132,37 @@ object GoogleSheetsSyncManager {
                 ?: return Result.failure(Exception("URL ไม่ถูกต้อง"))
 
             urlBuilder.addQueryParameter("timestamp", timeStr)
+            urlBuilder.addQueryParameter("วันเวลา", timeStr)
+
             urlBuilder.addQueryParameter("vehicleId", vehicleId)
+            urlBuilder.addQueryParameter("รหัสรถ", vehicleId)
+
             urlBuilder.addQueryParameter("vehicleName", vehicleName)
+            urlBuilder.addQueryParameter("ชื่อรถ", vehicleName)
+
             urlBuilder.addQueryParameter("licensePlate", licensePlate)
+            urlBuilder.addQueryParameter("ทะเบียนรถ", licensePlate)
+
             urlBuilder.addQueryParameter("driverName", driverName)
             urlBuilder.addQueryParameter("driver", driverName)
+            urlBuilder.addQueryParameter("ชื่อผู้ใช้/พนักงานขับรถ", driverName)
+            urlBuilder.addQueryParameter("พนักงานขับรถ", driverName)
+
             urlBuilder.addQueryParameter("status", status)
-            urlBuilder.addQueryParameter("latitude", latitude.toString())
-            urlBuilder.addQueryParameter("longitude", longitude.toString())
+            urlBuilder.addQueryParameter("สถานะ", status)
+
             urlBuilder.addQueryParameter("speedKmh", speedKmh.toString())
+            urlBuilder.addQueryParameter("speed", speedKmh.toString())
+            urlBuilder.addQueryParameter("ความเร็ว", speedKmh.toString())
+
+            urlBuilder.addQueryParameter("latitude", latitude.toString())
+            urlBuilder.addQueryParameter("lat", latitude.toString())
+            urlBuilder.addQueryParameter("ละติจูด", latitude.toString())
+
+            urlBuilder.addQueryParameter("longitude", longitude.toString())
+            urlBuilder.addQueryParameter("lng", longitude.toString())
+            urlBuilder.addQueryParameter("ลองจิจูด", longitude.toString())
+
             urlBuilder.addQueryParameter("fuelPercent", fuelPercent.toString())
             urlBuilder.addQueryParameter("batteryVoltage", batteryVoltage.toString())
 
@@ -158,7 +202,7 @@ object GoogleSheetsSyncManager {
                     val rawBody = response.body?.string()?.trim() ?: ""
                     if (rawBody.startsWith("<!DOCTYPE") || rawBody.startsWith("<html")) {
                         return@withContext Result.failure(
-                            Exception("URL Webhook ตอบกลับเป็นหน้าเว็บ HTML (กรุณาตรวจสอบการเปิดเผยแพร่ Web App เป็น 'Anyone' ใน Google Apps Script)")
+                            Exception("Webhook คืนค่าเป็น HTML: กรุณาเพิ่มการตรวจจับ e.parameter.action ใน doGet(e) เพื่อคืนค่า JSON")
                         )
                     }
 
