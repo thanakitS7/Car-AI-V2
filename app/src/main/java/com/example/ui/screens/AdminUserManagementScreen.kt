@@ -145,7 +145,7 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                             adminPinInput = it
                             pinError = false
                         },
-                        label = { Text("กรอกรหัส Admin PIN (รหัสเริ่มต้น 1234)") },
+                        label = { Text("กรอกรหัส Admin PIN") },
                         leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, tint = Color(0xFF38BDF8)) },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
@@ -162,7 +162,7 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                     if (pinError) {
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "❌ รหัส PIN ไม่ถูกต้อง! (ใช้รหัสเริ่มต้น 1234)",
+                            text = "❌ รหัส PIN ไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง",
                             color = Color(0xFFEF4444),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
@@ -173,7 +173,7 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
 
                     Button(
                         onClick = {
-                            if (adminPinInput == "1234" || adminPinInput.isBlank()) {
+                            if (adminPinInput == "0511") {
                                 isAdminUnlocked = true
                                 Toast.makeText(context, "🔓 เข้าสู่ระบบ Admin เรียบร้อยแล้ว", Toast.LENGTH_SHORT).show()
                             } else {
@@ -188,7 +188,7 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                     ) {
                         Icon(Icons.Default.LockOpen, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("ปลดล็อกเข้าสู่ระบบ Admin (PIN: 1234)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("ปลดล็อกเข้าสู่ระบบ Admin", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))

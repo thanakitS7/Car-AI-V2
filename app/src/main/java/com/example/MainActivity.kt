@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -82,7 +84,7 @@ fun AutoGuardApp() {
                     selected = selectedScreen == "ALERTS",
                     onClick = { selectedScreen = "ALERTS" },
                     icon = { Icon(imageVector = Icons.Default.NotificationsActive, contentDescription = "Alerts") },
-                    label = { Text("แจ้งเตือนความเร็ว", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    label = { Text("เตือนความเร็ว", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.White,
                         selectedTextColor = Color(0xFF6750A4),
