@@ -18,5 +18,6 @@ data class VehicleEntity(
     val batteryVoltage: Double,
     val activeRouteId: String?,
     val isEngineLocked: Boolean = false,
+    val driverName: String = "สมชาย ใจดี (คนขับ)",
     val lastUpdateMillis: Long = System.currentTimeMillis()
 )

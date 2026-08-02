@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.Info
@@ -176,6 +177,25 @@ fun LiveTrackingScreen(
         viewModel.setGpsPermissionGranted(granted)
         if (granted) {
             Toast.makeText(context, "✅ เปิดใช้งานสิทธิ์ GPS มือถือแล้ว", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "⚠️ กรุณาอนุญาตตำแหน่ง GPS เพื่อติดตามพิกัดจริง", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // Auto-prompt GPS permission safely after lifecycle is ready to prevent crashes
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(500)
+        if (!isGpsPermissionGranted) {
+            try {
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -600,6 +620,7 @@ fun LiveTrackingScreen(
                     onEndTrip = { viewModel.endTrip() },
                     onSetSpeedLimit = { viewModel.setSpeedLimitKmh(it) },
                     onUpdateGoogleSheetsUrl = { viewModel.updateGoogleSheetsUrl(it) },
+                    onUpdateDriverName = { viewModel.updateVehicleDriverName(currentVehicle.id, it) },
                     onShowSensorInfo = { showSensorInfoDialog = true }
                 )
             } else {
@@ -669,8 +690,8 @@ fun LiveTrackingScreen(
         if (showAddVehicleDialog) {
             AddVehicleDialog(
                 onDismiss = { showAddVehicleDialog = false },
-                onAdd = { name, plate, model ->
-                    viewModel.addNewVehicle(name, plate, model)
+                onAdd = { name, plate, model, driver ->
+                    viewModel.addNewVehicle(name, plate, model, driver)
                     showAddVehicleDialog = false
                     Toast.makeText(context, "เพิ่มยานพาหนะ $plate เรียบร้อย!", Toast.LENGTH_SHORT).show()
                 }
@@ -943,10 +964,12 @@ fun VehicleTelemetryCard(
     onEndTrip: () -> Unit,
     onSetSpeedLimit: (Int) -> Unit,
     onUpdateGoogleSheetsUrl: (String) -> Unit,
+    onUpdateDriverName: (String) -> Unit,
     onShowSensorInfo: () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(true) }
     var showUrlEditDialog by remember { mutableStateOf(false) }
+    var showDriverNameEditDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val distKm = tripDistanceMeters / 1000.0
@@ -1034,6 +1057,29 @@ fun VehicleTelemetryCard(
                             color = Color.LightGray,
                             fontSize = 12.sp
                         )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            Text(
+                                text = "👤 ผู้ใช้รถ/คนขับ: ${vehicle.driverName}",
+                                color = Color(0xFF38BDF8),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            IconButton(
+                                onClick = { showDriverNameEditDialog = true },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit Driver Name",
+                                    tint = Color(0xFF38BDF8),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
                     }
 
                     StatusChip(status = vehicle.status, isLocked = vehicle.isEngineLocked)
@@ -1287,6 +1333,20 @@ fun VehicleTelemetryCard(
             text = {
                 Column {
                     Text("ใส่ URL ของ Google Apps Script (doPost/doGet Web App) เพื่อส่งข้อมูลพิกัดรถสดไปบันทึกลง Google Sheet:", fontSize = 12.sp, color = Color(0xFF49454F))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        color = Color(0xFFECFDF5),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "✅ ลิ้งก์ Google Sheet จะได้รับข้อมูล driverName (ชื่อผู้ใช้รถ/คนขับ), vehicleName, licensePlate, timestamp, latitude, longitude, speedKmh, status อัตโนมัติ",
+                            fontSize = 11.sp,
+                            color = Color(0xFF047857),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = tempUrl,
@@ -1313,6 +1373,51 @@ fun VehicleTelemetryCard(
             },
             dismissButton = {
                 TextButton(onClick = { showUrlEditDialog = false }) {
+                    Text("ยกเลิก")
+                }
+            }
+        )
+    }
+
+    if (showDriverNameEditDialog) {
+        var tempDriverName by remember { mutableStateOf(vehicle.driverName) }
+        AlertDialog(
+            onDismissRequest = { showDriverNameEditDialog = false },
+            containerColor = Color.White,
+            title = {
+                Text("👤 แก้ไขชื่อผู้ใช้รถ / พนักงานขับรถ", color = Color(0xFF1D1B20), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            },
+            text = {
+                Column {
+                    Text("ชื่อนี้จะถูกส่งไปบันทึกลง Google Sheet พร้อมกับพิกัด GPS สดทุกครั้งที่มีการอัปเดต:", fontSize = 12.sp, color = Color(0xFF49454F))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = tempDriverName,
+                        onValueChange = { tempDriverName = it },
+                        label = { Text("ชื่อผู้ใช้รถ / พนักงานขับรถ") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF1D1B20),
+                            unfocusedTextColor = Color(0xFF1D1B20)
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (tempDriverName.isNotBlank()) {
+                            onUpdateDriverName(tempDriverName)
+                            showDriverNameEditDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4))
+                ) {
+                    Text("บันทึกชื่อผู้ใช้รถ")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDriverNameEditDialog = false }) {
                     Text("ยกเลิก")
                 }
             }
@@ -1397,11 +1502,12 @@ fun StatusChip(status: String, isLocked: Boolean) {
 @Composable
 fun AddVehicleDialog(
     onDismiss: () -> Unit,
-    onAdd: (name: String, licensePlate: String, modelYear: String) -> Unit
+    onAdd: (name: String, licensePlate: String, modelYear: String, driverName: String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var licensePlate by remember { mutableStateOf("") }
     var modelYear by remember { mutableStateOf("") }
+    var driverName by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1432,7 +1538,20 @@ fun AddVehicleDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("ชื่อเรียกประจำรถ / ชื่อคนขับ") },
+                    label = { Text("ชื่อเรียกประจำรถ (เช่น รถสิบล้อ #01)") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF1D1B20),
+                        unfocusedTextColor = Color(0xFF1D1B20),
+                        focusedBorderColor = Color(0xFF6750A4),
+                        unfocusedBorderColor = Color(0xFFCAC4D0)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = driverName,
+                    onValueChange = { driverName = it },
+                    label = { Text("👤 ชื่อผู้ใช้รถ / พนักงานขับรถ") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color(0xFF1D1B20),
                         unfocusedTextColor = Color(0xFF1D1B20),
@@ -1461,7 +1580,8 @@ fun AddVehicleDialog(
                 onClick = {
                     if (licensePlate.isNotBlank()) {
                         val finalName = name.ifBlank { "รถขนส่ง $licensePlate" }
-                        onAdd(finalName, licensePlate, modelYear)
+                        val finalDriver = driverName.ifBlank { "สมชาย ใจดี (คนขับ)" }
+                        onAdd(finalName, licensePlate, modelYear, finalDriver)
                     }
                 },
                 enabled = licensePlate.isNotBlank(),

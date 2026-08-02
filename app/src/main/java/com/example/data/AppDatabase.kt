@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         AlertEntity::class,
         LocationHistoryEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

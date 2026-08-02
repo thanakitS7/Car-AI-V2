@@ -218,6 +218,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                             vehicleId = vehicle.id,
                             vehicleName = vehicle.name,
                             licensePlate = vehicle.licensePlate,
+                            driverName = vehicle.driverName,
                             status = "⚠️ OVERSPEED (ขับเร็ว ${speedKmh} กม./ชม. เกินจำกัด ${limit} กม./ชม.)",
                             latitude = lat,
                             longitude = lng,
@@ -285,6 +286,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                     vehicleId = vehicle.id,
                     vehicleName = vehicle.name,
                     licensePlate = vehicle.licensePlate,
+                    driverName = vehicle.driverName,
                     status = if (speedKmh > 3) "MOVING (GPS สด)" else "IDLE (จอดพัก)",
                     latitude = lat,
                     longitude = lng,
@@ -337,6 +339,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                     vehicleId = vehicle.id,
                     vehicleName = vehicle.name,
                     licensePlate = vehicle.licensePlate,
+                    driverName = vehicle.driverName,
                     status = "MOVING (เริ่มเดินทาง GPS สด)",
                     latitude = vehicle.currentLat,
                     longitude = vehicle.currentLng,
@@ -370,6 +373,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                         vehicleId = vehicle.id,
                         vehicleName = vehicle.name,
                         licensePlate = vehicle.licensePlate,
+                        driverName = vehicle.driverName,
                         status = statusText,
                         latitude = vehicle.currentLat,
                         longitude = vehicle.currentLng,
@@ -428,6 +432,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                     vehicleId = vehicle.id,
                     vehicleName = vehicle.name,
                     licensePlate = vehicle.licensePlate,
+                    driverName = vehicle.driverName,
                     status = "PARKED (ถึงเป้าหมายเรียบร้อย)",
                     latitude = vehicle.currentLat,
                     longitude = vehicle.currentLng,
@@ -481,7 +486,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun addNewVehicle(name: String, licensePlate: String, modelYear: String) {
+    fun addNewVehicle(name: String, licensePlate: String, modelYear: String, driverName: String = "") {
         viewModelScope.launch {
             val newId = "V${System.currentTimeMillis() % 10000}"
             val vehicle = VehicleEntity(
@@ -497,10 +502,20 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                 fuelPercent = 95,
                 batteryVoltage = 12.8,
                 activeRouteId = "R001",
-                isEngineLocked = false
+                isEngineLocked = false,
+                driverName = driverName.ifBlank { "สมชาย ใจดี (คนขับ)" }
             )
             repository.addVehicle(vehicle)
             selectVehicle(newId)
+        }
+    }
+
+    fun updateVehicleDriverName(vehicleId: String, newDriverName: String) {
+        viewModelScope.launch {
+            val vehicles = allVehicles.value
+            val v = vehicles.firstOrNull { it.id == vehicleId } ?: return@launch
+            val updated = v.copy(driverName = newDriverName)
+            repository.addVehicle(updated)
         }
     }
 
@@ -551,6 +566,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                 vehicleId = vehicle.id,
                 vehicleName = vehicle.name,
                 licensePlate = vehicle.licensePlate,
+                driverName = vehicle.driverName,
                 status = vehicle.status,
                 latitude = vehicle.currentLat,
                 longitude = vehicle.currentLng,
@@ -629,6 +645,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                             vehicleId = currentVeh.id,
                             vehicleName = currentVeh.name,
                             licensePlate = currentVeh.licensePlate,
+                            driverName = currentVeh.driverName,
                             status = currentVeh.status,
                             latitude = targetPoint.lat,
                             longitude = targetPoint.lng,

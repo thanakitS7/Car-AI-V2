@@ -36,7 +36,8 @@ object GoogleSheetsSyncManager {
         longitude: Double,
         speedKmh: Int,
         fuelPercent: Int,
-        batteryVoltage: Double
+        batteryVoltage: Double,
+        driverName: String = ""
     ): Result<String> = withContext(Dispatchers.IO) {
         val targetUrl = webhookUrl.ifBlank { DEFAULT_WEBHOOK_URL }
         val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
@@ -48,6 +49,8 @@ object GoogleSheetsSyncManager {
                 put("vehicleId", vehicleId)
                 put("vehicleName", vehicleName)
                 put("licensePlate", licensePlate)
+                put("driverName", driverName)
+                put("driver", driverName)
                 put("status", status)
                 put("latitude", latitude)
                 put("longitude", longitude)
@@ -73,7 +76,7 @@ object GoogleSheetsSyncManager {
                     // Fallback to GET query parameters if POST requires redirect handling in Apps Script
                     val fallbackGetResult = sendGetFallback(
                         targetUrl, timeStr, vehicleId, vehicleName, licensePlate,
-                        status, latitude, longitude, speedKmh, fuelPercent, batteryVoltage
+                        status, latitude, longitude, speedKmh, fuelPercent, batteryVoltage, driverName
                     )
                     fallbackGetResult
                 }
@@ -83,7 +86,7 @@ object GoogleSheetsSyncManager {
             // Attempt GET fallback as Apps Script Web Apps handle doGet gracefully
             sendGetFallback(
                 targetUrl, timeStr, vehicleId, vehicleName, licensePlate,
-                status, latitude, longitude, speedKmh, fuelPercent, batteryVoltage
+                status, latitude, longitude, speedKmh, fuelPercent, batteryVoltage, driverName
             )
         }
     }
@@ -99,7 +102,8 @@ object GoogleSheetsSyncManager {
         longitude: Double,
         speedKmh: Int,
         fuelPercent: Int,
-        batteryVoltage: Double
+        batteryVoltage: Double,
+        driverName: String = ""
     ): Result<String> {
         return try {
             val urlBuilder = baseUrl.toHttpUrlOrNull()?.newBuilder()
@@ -109,6 +113,8 @@ object GoogleSheetsSyncManager {
             urlBuilder.addQueryParameter("vehicleId", vehicleId)
             urlBuilder.addQueryParameter("vehicleName", vehicleName)
             urlBuilder.addQueryParameter("licensePlate", licensePlate)
+            urlBuilder.addQueryParameter("driverName", driverName)
+            urlBuilder.addQueryParameter("driver", driverName)
             urlBuilder.addQueryParameter("status", status)
             urlBuilder.addQueryParameter("latitude", latitude.toString())
             urlBuilder.addQueryParameter("longitude", longitude.toString())
