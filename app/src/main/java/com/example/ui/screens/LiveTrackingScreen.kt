@@ -8,6 +8,7 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -159,7 +160,6 @@ fun LiveTrackingScreen(
     var showSensorInfoDialog by remember { mutableStateOf(false) }
     var showSpeedLimitDialog by remember { mutableStateOf(false) }
     var showLocationSearchDialog by remember { mutableStateOf(false) }
-    var isTopPanelExpanded by remember { mutableStateOf(true) }
 
     // GPS Permission launcher
     var isGpsPermissionGranted by remember {
@@ -188,12 +188,14 @@ fun LiveTrackingScreen(
         kotlinx.coroutines.delay(500)
         if (!isGpsPermissionGranted) {
             try {
-                locationPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
+                val permsList = mutableListOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
                 )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    permsList.add(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                locationPermissionLauncher.launch(permsList.toTypedArray())
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -221,11 +223,31 @@ fun LiveTrackingScreen(
                 override fun onProviderDisabled(provider: String) {}
             }
 
-            try {
-                locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 1f, locationListener)
-                locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 3f, locationListener)
-            } catch (e: SecurityException) {
-                // Security exception fallback
+            val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            if (hasFine || hasCoarse) {
+                try {
+                    if (locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true) {
+                        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 1f, locationListener)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                try {
+                    if (locationManager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true) {
+                        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 3f, locationListener)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
 
             onDispose {
@@ -252,7 +274,7 @@ fun LiveTrackingScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp)
+                .padding(top = 64.dp)
                 .animateContentSize()
         ) {
             // Prominent Overspeed Warning Banner (Centered Underneath Bell Icon)
@@ -347,218 +369,6 @@ fun LiveTrackingScreen(
                     }
                 }
             }
-            if (isTopPanelExpanded) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "🚘 เลือกรถ / สถานะการเดินทาง",
-                        color = Color.LightGray,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(
-                        onClick = { isTopPanelExpanded = false },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Collapse Top Bar",
-                            tint = Color.White
-                        )
-                    }
-                }
-
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(vehicles) { v ->
-                        val isSelected = v.id == currentVehicle?.id
-                        VehicleChipItem(
-                            vehicle = v,
-                            isSelected = isSelected,
-                            onClick = { viewModel.selectVehicle(v.id) }
-                        )
-                    }
-
-                    item {
-                        Surface(
-                            onClick = { showAddVehicleDialog = true },
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color(0xFF6750A4),
-                            modifier = Modifier.height(36.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add Vehicle", tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("+ เพิ่มรถ/ใส่ทะเบียน", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
-                // Top Floating Driver Trip Action Bar
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xF20F172A),
-                    border = BorderStroke(1.5.dp, if (isTripActive) EmeraldSafe else Color(0xFF475569)),
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .fillMaxWidth()
-                        .pointerInput(Unit) {
-                            detectVerticalDragGestures { _, dragAmount ->
-                                if (dragAmount < -12) isTopPanelExpanded = false
-                            }
-                        }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isTripActive && !isTripPaused) EmeraldSafe else if (isTripPaused) AmberWarning else Color.Gray)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = if (isTripActive && !isTripPaused) "🟢 กำลังเดินทาง (ส่งพิกัดสด)" else if (isTripActive && isTripPaused) "⏸️ พักรถอยู่ (พักการทำงาน GPS)" else "⏹ ยังไม่ได้เริ่มเดินทาง",
-                                    color = if (isTripActive && !isTripPaused) EmeraldSafe else if (isTripPaused) AmberWarning else Color.LightGray,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Text(
-                                text = if (isTripActive && !isTripPaused) "ระบบซิงค์ข้อมูลเข้า Google Sheets สดอัตโนมัติ" else if (isTripPaused) "กด 'เดินทางต่อ' เพื่อเริ่มรับส่งพิกัด GPS อีกครั้ง" else "กด 'เริ่มเดินทาง' เมื่อเริ่มออกวิ่งงาน",
-                                color = Color.Gray,
-                                fontSize = 10.sp
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        if (!isTripActive) {
-                            Button(
-                                onClick = {
-                                    viewModel.startTrip()
-                                    Toast.makeText(context, "🚀 เริ่มออกเดินทางแล้ว! เปิดติดตามพิกัดสด", Toast.LENGTH_SHORT).show()
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldSafe, contentColor = Color.Black),
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = "Start Trip", modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("เริ่มเดินทาง", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
-                        } else {
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Button(
-                                    onClick = { viewModel.pauseTrip() },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isTripPaused) AmberWarning else Color(0xFF334155),
-                                        contentColor = Color.White
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(if (isTripPaused) Icons.Default.PlayArrow else Icons.Default.Pause, contentDescription = "Pause", modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(2.dp))
-                                    Text(if (isTripPaused) "เดินทางต่อ" else "พักรถ", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                }
-
-                                Button(
-                                    onClick = {
-                                        viewModel.endTrip()
-                                        Toast.makeText(context, "🏁 ถึงเป้าหมายเรียบร้อย! สรุปการเดินทาง", Toast.LENGTH_SHORT).show()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonAlert, contentColor = Color.White),
-                                    shape = RoundedCornerShape(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(Icons.Default.CheckCircle, contentDescription = "Arrived", modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(2.dp))
-                                    Text("ถึงเป้าหมาย", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Collapsed Top Pill Header (Tap/Swipe Down to Expand)
-                Surface(
-                    onClick = { isTopPanelExpanded = true },
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color(0xF20F172A),
-                    border = BorderStroke(1.dp, Color(0xFF334155)),
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .pointerInput(Unit) {
-                            detectVerticalDragGestures { _, dragAmount ->
-                                if (dragAmount > 12) isTopPanelExpanded = true
-                            }
-                        }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.DirectionsCar,
-                                contentDescription = "Vehicle Selected",
-                                tint = CyberCyanPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "${currentVehicle?.name ?: "เลือกยานพาหนะ"} (${currentVehicle?.licensePlate ?: ""})",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isTripActive) "🟢 กำลังวิ่งงาน" else "⏸️ ยังไม่เริ่ม",
-                                color = if (isTripActive) EmeraldSafe else Color.Gray,
-                                fontSize = 11.sp
-                            )
-                        }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "ขยายแถบ",
-                                color = CyberCyanPrimary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Expand Top Panel",
-                                tint = CyberCyanPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
             // Unblocked Floating Google Maps Location Search Bar
             Surface(
                 onClick = { showLocationSearchDialog = true },
@@ -619,12 +429,15 @@ fun LiveTrackingScreen(
             if (currentVehicle != null) {
                 VehicleTelemetryCard(
                     vehicle = currentVehicle,
+                    vehicles = vehicles,
                     isTripActive = isTripActive,
                     isTripPaused = isTripPaused,
                     tripDistanceMeters = tripDistanceMeters,
                     speedLimitKmh = speedLimitKmh,
                     googleSheetsUrl = googleSheetsUrl,
                     lastSyncStatus = lastSyncStatus,
+                    onSelectVehicle = { viewModel.selectVehicle(it) },
+                    onAddVehicle = { showAddVehicleDialog = true },
                     onStartTrip = { viewModel.startTrip() },
                     onPauseTrip = { viewModel.pauseTrip() },
                     onEndTrip = { viewModel.endTrip() },
@@ -963,12 +776,15 @@ fun OutofRouteAlertBanner(
 @Composable
 fun VehicleTelemetryCard(
     vehicle: VehicleEntity,
+    vehicles: List<VehicleEntity> = emptyList(),
     isTripActive: Boolean,
     isTripPaused: Boolean,
     tripDistanceMeters: Double,
     speedLimitKmh: Int,
     googleSheetsUrl: String,
     lastSyncStatus: String,
+    onSelectVehicle: (String) -> Unit = {},
+    onAddVehicle: () -> Unit = {},
     onStartTrip: () -> Unit,
     onPauseTrip: () -> Unit,
     onEndTrip: () -> Unit,
@@ -1048,6 +864,54 @@ fun VehicleTelemetryCard(
 
             if (isExpanded) {
                 Spacer(modifier = Modifier.height(6.dp))
+
+                // Bottom Vehicle Switcher Chips & Add Vehicle Button
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                ) {
+                    items(vehicles) { v ->
+                        val isSelected = (v.id == vehicle.id)
+                        Surface(
+                            onClick = { onSelectVehicle(v.id) },
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (isSelected) CyberCyanPrimary else Color(0xFF334155),
+                            contentColor = if (isSelected) Color.Black else Color.White
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "🚘 ${v.name} (${v.licensePlate})",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+                        Surface(
+                            onClick = onAddVehicle,
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color(0xFF6750A4),
+                            contentColor = Color.White
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add Vehicle", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("+ เพิ่มรถ/ใส่ทะเบียน", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
 
                 // Vehicle Header Status Row
                 Row(

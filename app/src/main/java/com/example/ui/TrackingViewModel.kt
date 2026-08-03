@@ -321,6 +321,12 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         _tripOverspeedCount.value = 0
         _tripSummary.value = null
 
+        try {
+            com.example.service.TrackingForegroundService.startService(getApplication())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         val vehicle = activeVehicle.value
         if (vehicle != null) {
             lastGpsLat = vehicle.currentLat
@@ -416,6 +422,12 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         _isTripPaused.value = false
         _isSimulating.value = false
         simulationJob?.cancel()
+
+        try {
+            com.example.service.TrackingForegroundService.stopService(getApplication())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         if (vehicle != null) {
             viewModelScope.launch {
