@@ -128,7 +128,8 @@ fun MapViewCanvas(
             .background(mapBgColor)
     ) {
         if (mapMode.startsWith("LEAFLET")) {
-            val htmlContent = remember(centerLat, centerLng, mapMode, historyPoints.size) {
+            // Only regenerate HTML when map mode changes (e.g. Light/Dark/Satellite)
+            val htmlContent = remember(mapMode) {
                 generateLeafletHtml(
                     lat = centerLat,
                     lng = centerLng,
@@ -141,7 +142,6 @@ fun MapViewCanvas(
                 )
             }
 
-            // เพิ่มตัวแปรสำหรับเช็คการโหลด HTML เพื่อไม่ให้โหลดซ้ำซ้อน
             var lastLoadedHtml by remember { mutableStateOf("") }
 
             AndroidView(
@@ -151,6 +151,7 @@ fun MapViewCanvas(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
+                        setBackgroundColor(android.graphics.Color.parseColor("#0f172a"))
                         webViewClient = WebViewClient()
                         webChromeClient = WebChromeClient()
                         settings.javaScriptEnabled = true
@@ -169,10 +170,22 @@ fun MapViewCanvas(
                         lastLoadedHtml = htmlContent
                     }
 
+                    // Update vehicle position smoothly via JS without page reload
                     val nameJson = JSONObject.quote(vehicleName)
                     val plateJson = JSONObject.quote(licensePlate)
                     val js = "if (typeof updateVehiclePosition === 'function') { updateVehiclePosition($centerLat, $centerLng, $speed, $nameJson, $plateJson, $heading); }"
                     webView.evaluateJavascript(js, null)
+
+                    // Update history polyline via JS without page reload
+                    val historyJsonArray = JSONArray()
+                    for (pt in historyPoints) {
+                        val arr = JSONArray()
+                        arr.put(pt.latitude)
+                        arr.put(pt.longitude)
+                        historyJsonArray.put(arr)
+                    }
+                    val historyJs = "if (typeof window.updateHistoryPoints === 'function') { window.updateHistoryPoints($historyJsonArray); }"
+                    webView.evaluateJavascript(historyJs, null)
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -626,10 +639,19 @@ private fun generateLeafletHtml(
                 window.recenterMap = function(l1, l2) { map.setView([l1, l2], 15); };
 
                 // History Track Polyline
+                var historyPolyline = null;
+                window.updateHistoryPoints = function(pointsArray) {
+                    if (historyPolyline) {
+                        map.removeLayer(historyPolyline);
+                        historyPolyline = null;
+                    }
+                    if (pointsArray && pointsArray.length > 0) {
+                        historyPolyline = L.polyline(pointsArray, { color: '#38bdf8', weight: 6, opacity: 0.9, lineCap: 'round' }).addTo(map);
+                    }
+                };
+
                 var historyCoords = $historyJsonArray;
-                if (historyCoords && historyCoords.length > 0) {
-                    L.polyline(historyCoords, { color: '#38bdf8', weight: 6, opacity: 0.9, lineCap: 'round' }).addTo(map);
-                }
+                window.updateHistoryPoints(historyCoords);
 
                 // Vehicle Marker
                 var vehicleMarker = null;
