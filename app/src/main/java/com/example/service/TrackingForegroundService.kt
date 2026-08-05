@@ -225,10 +225,32 @@ class TrackingForegroundService : Service() {
                     heading = heading
                 )
 
-                // Rate limit Google Sheets sync to every 5 seconds
+                // Rate limit cloud sync to every 5 seconds
                 val now = System.currentTimeMillis()
                 if (now - lastSyncTimeMs > 5000L) {
                     lastSyncTimeMs = now
+                    
+                    // Supabase Cloud Sync
+                    try {
+                        com.example.util.SupabaseSyncManager.sendTelemetryToSupabase(
+                            baseUrl = com.example.util.SupabaseSyncManager.DEFAULT_SUPABASE_URL,
+                            anonKey = com.example.util.SupabaseSyncManager.DEFAULT_ANON_KEY,
+                            vehicleId = activeVehicle.id,
+                            vehicleName = activeVehicle.name,
+                            licensePlate = activeVehicle.licensePlate,
+                            driverName = activeVehicle.driverName,
+                            status = if (speedKmh > 3) "MOVING (GPS สดภูมิหลัง)" else "IDLE (จอดพักภูมิหลัง)",
+                            latitude = lat,
+                            longitude = lng,
+                            speedKmh = speedKmh,
+                            fuelPercent = activeVehicle.fuelPercent,
+                            batteryVoltage = activeVehicle.batteryVoltage
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+
+                    // Google Sheets Sync
                     GoogleSheetsSyncManager.sendTelemetryToGoogleSheets(
                         webhookUrl = GoogleSheetsSyncManager.DEFAULT_WEBHOOK_URL,
                         vehicleId = activeVehicle.id,

@@ -1739,12 +1739,17 @@ fun GoogleLocationSearchDialog(
 
     val popularLocations = listOf(
         Triple("✈️ สนามบินสุวรรณภูมิ (Bangkok BKK)", 13.6900, 100.7500),
+        Triple("🛫 สนามบินดอนเมือง (Bangkok DMK)", 13.9130, 100.6010),
         Triple("🏢 คลังสินค้า ICD ลาดกระบัง", 13.7292, 100.6782),
         Triple("🏛️ อนุสาวรีย์ชัยสมรภูมิ กรุงเทพฯ", 13.7628, 100.5372),
+        Triple("🛍️ สยามพารากอน / ปทุมวัน", 13.7460, 100.5340),
         Triple("🛣️ ด่านทางด่วนมอเตอร์เวย์ พระราม 9", 13.7420, 100.6150),
         Triple("🚚 ถ.บางนา-ตราด กม.10", 13.6350, 100.7050),
         Triple("🌊 นิคมอุตสาหกรรม อมตะ ชลบุรี", 13.3611, 100.9847),
-        Triple("🏙️ ดอนเมือง / ถ.วิภาวดีรังสิต", 13.9130, 100.6010)
+        Triple("🏭 นิคมอุตสาหกรรม มาบตาพุด ระยอง", 12.7214, 101.1552),
+        Triple("🏞️ ประตูท่าแพ เชียงใหม่", 18.7877, 98.9932),
+        Triple("🏖️ หาดป่าตอง ภูเก็ต", 7.8920, 98.2980),
+        Triple("🏙️ เซ็นทรัล ขอนแก่น", 16.4322, 102.8288)
     )
 
     fun performSearch() {
@@ -1752,12 +1757,16 @@ fun GoogleLocationSearchDialog(
         isSearching = true
         hasSearched = true
         coroutineScope.launch {
-            val query = searchQuery.trim()
+            val rawQuery = searchQuery.trim()
+            val queryToSearch = if (!rawQuery.contains("ไทย") && !rawQuery.lowercase().contains("thailand")) {
+                "$rawQuery, Thailand"
+            } else rawQuery
+
             val list = mutableListOf<OnlineSearchResult>()
             try {
                 withContext(Dispatchers.IO) {
-                    val encoded = URLEncoder.encode(query, "UTF-8")
-                    val urlString = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded&addressdetails=1&limit=10"
+                    val encoded = URLEncoder.encode(queryToSearch, "UTF-8")
+                    val urlString = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded&addressdetails=1&limit=12&countrycodes=th"
                     val url = URL(urlString)
                     val conn = url.openConnection() as HttpURLConnection
                     conn.requestMethod = "GET"
@@ -1775,7 +1784,7 @@ fun GoogleLocationSearchDialog(
                             val lngVal = obj.optString("lon", "0").toDoubleOrNull() ?: 0.0
 
                             val parts = rawName.split(",")
-                            val title = parts.firstOrNull()?.trim() ?: query
+                            val title = parts.firstOrNull()?.trim() ?: rawQuery
                             val subtitle = if (parts.size > 1) parts.drop(1).take(3).joinToString(", ").trim() else rawName
 
                             if (latVal != 0.0 && lngVal != 0.0) {
