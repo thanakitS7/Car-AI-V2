@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CarTrack AI - Live Fleet Tracking Dashboard</title>
+    <title>CarTrack AI - Live Fleet & History Dashboard</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React, ReactDOM & Recharts CDN for Fleet Reports Chart -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -47,39 +52,72 @@
             </div>
             <div>
                 <h1 class="font-bold text-lg leading-none text-white tracking-wide">CarTrack AI <span class="text-xs font-normal text-sky-400 bg-sky-950/80 px-2 py-0.5 rounded-full border border-sky-500/30">Fleet Web</span></h1>
-                <p class="text-xs text-slate-400">ระบบติดตามยานพาหนะเรียลไทม์ (Supabase Cloud Sync)</p>
+                <p class="text-xs text-slate-400">ระบบติดตามยานพาหนะและประวัติเส้นทางเรียลไทม์</p>
             </div>
         </div>
 
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-2 md:space-x-3">
             <div id="syncStatus" class="hidden md:flex items-center space-x-2 text-xs bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-                <span class="text-emerald-400 font-medium">กำลังเชื่อมต่อ Supabase สด</span>
+                <span class="text-emerald-400 font-medium">เชื่อมต่อ Supabase สด</span>
                 <span id="lastUpdated" class="text-slate-400 font-mono text-[11px] ml-1">--:--:--</span>
             </div>
 
-            <button onclick="fetchVehiclesData()" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 transition">
-                <i class="fa-solid fa-rotate"></i>
-                <span>รีเฟรช</span>
+            <!-- User Login / Profile Status Badge -->
+            <div id="userHeaderProfile" class="flex items-center space-x-2">
+                <!-- Injected via JavaScript updateAuthUI() -->
+            </div>
+
+            <!-- Daily & Monthly Usage Search & Report Button -->
+            <button onclick="openDailyReportModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 transition shadow-lg shadow-emerald-600/20">
+                <i class="fa-solid fa-calendar-check"></i>
+                <span class="hidden sm:inline">ค้นหารายงาน ย้อนหลัง / รายเดือน</span>
+                <span class="sm:hidden">รายงาน</span>
             </button>
 
-            <button onclick="toggleSettingsModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-2 rounded-lg text-xs transition">
-                <i class="fa-solid fa-gear text-sm"></i>
+            <!-- Admin & User Manager Vehicle Management Button -->
+            <button onclick="openAdminModal()" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 transition shadow-lg shadow-purple-600/20">
+                <i class="fa-solid fa-user-gear"></i>
+                <span id="manageBtnText">จัดการข้อมูล (Admin / Manager)</span>
+            </button>
+
+            <!-- Refresh Button -->
+            <button onclick="fetchVehiclesData()" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 transition">
+                <i class="fa-solid fa-rotate"></i>
+                <span class="hidden md:inline">รีเฟรช</span>
             </button>
         </div>
     </header>
 
     <!-- Main Content Body -->
-    <div class="flex flex-1 overflow-hidden relative">
+    <div class="flex flex-col md:flex-row flex-1 overflow-hidden relative">
+
+        <!-- Mobile Navigation Tab Switcher Bar (Visible on Mobile < md) -->
+        <div id="mobileNavBar" class="md:hidden bg-slate-900/95 border-b border-slate-700/80 p-2 flex items-center space-x-2 z-20 shrink-0 shadow-xl">
+            <button id="mobileBtnList" onclick="switchMobileTab('list')" class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 bg-slate-800 text-slate-300 border border-slate-700 hover:text-white">
+                <i class="fa-solid fa-list-ul text-sky-400"></i>
+                <span>รายการรถ (<span id="mobileTotalCount">0</span> คัน)</span>
+            </button>
+            <button id="mobileBtnMap" onclick="switchMobileTab('map')" class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 bg-sky-600 text-white shadow-lg shadow-sky-600/20">
+                <i class="fa-solid fa-map-location-dot"></i>
+                <span>แผนที่สด (Live Map)</span>
+            </button>
+        </div>
 
         <!-- Sidebar: Vehicle List -->
-        <aside id="sidebar" class="w-full md:w-96 bg-slate-800/95 backdrop-blur border-r border-slate-700 flex flex-col z-10 transition-all duration-300">
+        <aside id="sidebar" class="hidden md:flex w-full md:w-96 bg-slate-800/95 backdrop-blur border-r border-slate-700 flex-col z-10 transition-all duration-300 flex-1 md:flex-none h-full overflow-hidden">
             <!-- Search & Filter Header -->
-            <div class="p-3 border-b border-slate-700 space-y-2">
-                <div class="relative">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
-                    <input type="text" id="searchInput" oninput="filterVehicles()" placeholder="ค้นหาชื่อรถ / ทะเบียน / คนขับ..." 
-                           class="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-sky-500 placeholder-slate-500">
+            <div class="p-3 border-b border-slate-700 space-y-2 shrink-0">
+                <div class="flex items-center space-x-1.5">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="filterVehicles()" placeholder="ค้นหาชื่อรถ / ทะเบียน / คนขับ..." 
+                               class="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-sky-500 placeholder-slate-500">
+                    </div>
+                    <button onclick="clearSearch()" title="ล้างค่าการค้นหา" class="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-200 px-3 py-2 rounded-lg text-xs font-medium transition flex items-center space-x-1 shrink-0 border border-slate-600">
+                        <i class="fa-solid fa-rotate-left text-[11px]"></i>
+                        <span>ล้างค่า</span>
+                    </button>
                 </div>
 
                 <div class="flex items-center justify-between text-xs text-slate-400 px-1">
@@ -88,6 +126,14 @@
                         <span class="text-emerald-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>วิ่งอยู่ <strong id="movingCount">0</strong></span>
                         <span class="text-amber-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>จอด <strong id="idleCount">0</strong></span>
                     </div>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-slate-400 px-1 pt-2 border-t border-slate-700/60">
+                    <label class="flex items-center space-x-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+                        <input type="checkbox" id="groupByProvinceToggle" onchange="toggleGroupByProvince(this.checked)" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-sky-500 w-3.5 h-3.5">
+                        <span class="text-[11px] font-medium"><i class="fa-solid fa-folder-tree text-sky-400 mr-1"></i>จัดกลุ่มตามกลุ่มจังหวัด</span>
+                    </label>
+                    <span id="groupCountBadge" class="hidden text-[10px] text-sky-400 bg-sky-950 px-1.5 py-0.5 rounded border border-sky-800 font-mono">0 กลุ่ม</span>
                 </div>
             </div>
 
@@ -101,11 +147,153 @@
         </aside>
 
         <!-- Map Container -->
-        <main class="flex-1 relative">
-            <div id="map"></div>
+        <main id="mapContainer" class="flex-1 relative flex flex-col h-full w-full">
+            <div id="map" class="w-full h-full"></div>
+
+            <!-- Floating Layer Switcher Toolbar -->
+            <div class="absolute top-3 left-3 right-14 sm:left-auto sm:right-14 z-20 bg-slate-800/90 border border-slate-700 p-1 rounded-xl shadow-2xl backdrop-blur flex items-center space-x-1 text-xs overflow-x-auto max-w-[calc(100vw-70px)] sm:max-w-none">
+                <button onclick="switchMapLayer('street')" id="btn-layer-street" class="px-2 py-1 rounded-lg text-xs font-semibold bg-sky-600 text-white shadow transition flex items-center space-x-1 shrink-0">
+                    <i class="fa-solid fa-map"></i> <span>ถนน</span>
+                </button>
+                <button onclick="switchMapLayer('dark')" id="btn-layer-dark" class="px-2 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center space-x-1 shrink-0">
+                    <i class="fa-solid fa-moon"></i> <span>มืด</span>
+                </button>
+                <button onclick="switchMapLayer('satellite')" id="btn-layer-satellite" class="px-2 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center space-x-1 shrink-0">
+                    <i class="fa-solid fa-globe"></i> <span>ดาวเทียม</span>
+                </button>
+                <button onclick="switchMapLayer('hybrid')" id="btn-layer-hybrid" class="px-2 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center space-x-1 shrink-0">
+                    <i class="fa-solid fa-layer-group"></i> <span>ดาวเทียม+ถนน</span>
+                </button>
+            </div>
+
+            <!-- Floating Auto-Follow & Fit Bounds Controls -->
+            <div class="absolute top-14 sm:top-16 left-3 right-14 sm:left-auto sm:right-14 z-20 flex flex-wrap items-center justify-end gap-1.5 max-w-[calc(100vw-70px)] sm:max-w-none">
+                <button onclick="fitMapBoundsAllVehicles()" title="ปรับระดับซูมอัตโนมัติให้ครอบคลุมรถทั้งหมด" class="bg-slate-800/90 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-xl shadow-2xl backdrop-blur flex items-center space-x-1.5 text-xs text-sky-400 font-medium transition active:scale-95">
+                    <i class="fa-solid fa-expand text-sky-400"></i>
+                    <span class="text-[11px] sm:text-xs text-slate-200">ซูมครอบคลุมทั้งหมด</span>
+                </button>
+
+                <div class="bg-slate-800/90 border border-slate-700 px-2.5 py-1.5 rounded-xl shadow-2xl backdrop-blur flex items-center space-x-2 text-xs">
+                    <div class="flex items-center space-x-1.5 text-slate-200">
+                        <i class="fa-solid fa-crosshairs text-slate-400 text-xs" id="autoFollowIcon"></i>
+                        <span class="font-medium text-[11px] sm:text-xs">ติดตามรถสด</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer ml-1">
+                        <input type="checkbox" id="autoFollowToggle" onchange="toggleAutoFollow(this.checked)" class="sr-only peer">
+                        <div class="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-sky-500"></div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Floating Selected Vehicle Live Tracker Card (Mobile & Desktop) -->
+            <div id="mobileVehicleTrackingCard" class="hidden absolute bottom-3 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-slate-900/95 border border-sky-500/50 rounded-2xl p-3 shadow-2xl backdrop-blur z-30 text-xs text-slate-100 font-sans space-y-2 transition-all">
+                <!-- Dynamically populated via JavaScript updateMobileTrackingCard() -->
+            </div>
+
+            <!-- Floating History Playback Control HUD (Docked at Bottom of Map) -->
+            <div id="historyModal" class="hidden absolute bottom-3 left-3 right-3 sm:left-auto sm:right-4 sm:w-[480px] z-40 bg-slate-900/95 border border-sky-500/60 rounded-2xl p-3 sm:p-4 shadow-2xl backdrop-blur text-xs text-slate-100 space-y-2.5 transition-all">
+                <!-- Header Row -->
+                <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div class="flex items-center space-x-2 truncate pr-2">
+                        <div class="w-7 h-7 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold shrink-0">
+                            <i class="fa-solid fa-clock-rotate-left text-xs"></i>
+                        </div>
+                        <div class="truncate">
+                            <h4 class="font-bold text-white text-xs sm:text-sm truncate" id="historyModalTitle">ประวัติเส้นทางย้อนหลัง</h4>
+                            <p class="text-[10px] text-slate-400 truncate" id="historyModalSub">กำลังโหลดข้อมูลประวัติ...</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-1 shrink-0">
+                        <button onclick="toggleHistoryLogDrawer()" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 px-2 py-1 rounded-lg transition flex items-center space-x-1" title="สลับเปิด/ปิดตารางรายการพิกัด">
+                            <i class="fa-solid fa-list-ul"></i>
+                            <span class="hidden sm:inline">ตารางพิกัด</span>
+                        </button>
+                        <button onclick="closeHistoryMode()" class="text-slate-400 hover:text-white p-1 text-base ml-1" title="ปิดเส้นทางย้อนหลัง">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Summary Badges Pill Bar -->
+                <div class="grid grid-cols-4 gap-1.5 text-center text-[10px]">
+                    <div class="bg-slate-800/80 border border-slate-700/80 p-1.5 rounded-lg">
+                        <span class="text-slate-400 block text-[9px]"><i class="fa-solid fa-route text-sky-400 mr-0.5"></i>ระยะทาง</span>
+                        <strong class="text-sky-400 font-bold" id="histTotalKm">0.0 กม.</strong>
+                    </div>
+                    <div class="bg-slate-800/80 border border-slate-700/80 p-1.5 rounded-lg">
+                        <span class="text-slate-400 block text-[9px]"><i class="fa-solid fa-gauge text-amber-400 mr-0.5"></i>ความเร็วสูงสุด</span>
+                        <strong class="text-amber-400 font-bold" id="histMaxSpeed">0 km/h</strong>
+                    </div>
+                    <div class="bg-slate-800/80 border border-slate-700/80 p-1.5 rounded-lg">
+                        <span class="text-slate-400 block text-[9px]"><i class="fa-solid fa-location-dot text-indigo-400 mr-0.5"></i>จำนวนจุด</span>
+                        <strong class="text-indigo-400 font-bold" id="histPointCount">0 จุด</strong>
+                    </div>
+                    <div class="bg-slate-800/80 border border-slate-700/80 p-1.5 rounded-lg">
+                        <span class="text-slate-400 block text-[9px]"><i class="fa-solid fa-clock text-emerald-400 mr-0.5"></i>ช่วงเวลา</span>
+                        <strong class="text-emerald-400 font-bold" id="histTimeRange">--:--</strong>
+                    </div>
+                </div>
+
+                <!-- Playback Controller Row -->
+                <div class="space-y-1.5 pt-0.5">
+                    <div class="flex items-center justify-between text-[11px]">
+                        <div class="flex items-center space-x-1.5 text-slate-300 truncate pr-2">
+                            <i class="fa-solid fa-location-dot text-rose-400 shrink-0"></i>
+                            <span id="playbackLocationText" class="truncate">สถานที่: กำลังโหลด...</span>
+                        </div>
+                        <span id="playbackCurrentTime" class="font-mono text-sky-400 font-bold bg-sky-950/80 border border-sky-800/60 px-2 py-0.5 rounded text-[10px] shrink-0">--:--:--</span>
+                    </div>
+
+                    <!-- Slider Bar -->
+                    <input type="range" id="playbackSlider" min="0" max="100" value="0" oninput="onPlaybackSliderChange(this.value)" class="w-full accent-sky-500 bg-slate-800 rounded-lg cursor-pointer h-2">
+
+                    <!-- Control Buttons -->
+                    <div class="flex items-center justify-between pt-1">
+                        <div class="flex items-center space-x-1.5">
+                            <button onclick="resetPlayback()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg text-xs flex items-center space-x-1 transition border border-slate-700">
+                                <i class="fa-solid fa-backward-step"></i>
+                                <span>เริ่มใหม่</span>
+                            </button>
+                            <button onclick="togglePlayback()" id="playPauseBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-3.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-lg shadow-sky-600/20 transition">
+                                <i class="fa-solid fa-play" id="playIcon"></i>
+                                <span id="playText">เล่น</span>
+                            </button>
+                        </div>
+
+                        <!-- Speed selector & Auto-center -->
+                        <div class="flex items-center space-x-1.5">
+                            <button onclick="cyclePlaybackSpeed()" id="playbackSpeedBtn" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 px-2 py-1 rounded-lg text-[10px] font-bold font-mono transition" title="ปรับความเร็วการเล่น">
+                                ⚡ 1x
+                            </button>
+                            <button onclick="centerPlaybackMarker()" class="bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 px-2 py-1 rounded-lg text-[10px] transition" title="ซูมโฟกัสตำแหน่งรถย้อนหลังบนแผนที่">
+                                <i class="fa-solid fa-crosshairs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Collapsible Timeline Log Table Drawer -->
+                <div id="historyLogDrawer" class="hidden border-t border-slate-800 pt-2 max-h-36 overflow-y-auto">
+                    <table class="w-full text-left text-[11px] text-slate-300">
+                        <thead class="bg-slate-800/90 text-slate-400 sticky top-0 font-medium">
+                            <tr>
+                                <th class="p-1.5">เวลา</th>
+                                <th class="p-1.5">สถานที่ / ที่อยู่</th>
+                                <th class="p-1.5">ความเร็ว</th>
+                                <th class="p-1.5">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="divide-y divide-slate-800/80">
+                            <tr>
+                                <td colspan="4" class="p-3 text-center text-slate-500">ไม่มีข้อมูลประวัติ</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             <!-- Floating Legend -->
-            <div class="absolute bottom-6 right-6 bg-slate-800/90 border border-slate-700 p-3 rounded-xl shadow-xl z-10 backdrop-blur text-xs text-slate-300 space-y-1.5">
+            <div class="hidden sm:block absolute bottom-6 right-6 bg-slate-800/90 border border-slate-700 p-3 rounded-xl shadow-xl z-10 backdrop-blur text-xs text-slate-300 space-y-1.5">
                 <div class="font-semibold text-slate-100 mb-1">สัญลักษณ์สถานะบนแผนที่</div>
                 <div class="flex items-center space-x-2">
                     <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
@@ -118,58 +306,751 @@
             </div>
         </main>
 
+    <!-- Daily Fleet Usage Search & Report Modal -->
+    <div id="dailyReportModal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-5xl h-[92vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-slate-900 border-b border-slate-700 p-4 flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xl">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-100 text-base">📊 ค้นหารายงานการใช้รถย้อนหลัง (Fleet History & Monthly Report)</h3>
+                        <p class="text-xs text-slate-400">เลือกวันที่หรือรายเดือนเพื่อค้นหาจำนวนรถที่ออกวิ่ง รายงานการเดินทาง และระยะทาง (กม.) แต่ละคัน</p>
+                    </div>
+                </div>
+                <button onclick="toggleDailyReportModal(false)" class="text-slate-400 hover:text-white text-xl p-1"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Modal Content Body -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Date Filter & Search Controls -->
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <!-- Search Mode Selector -->
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1 font-medium"><i class="fa-solid fa-sliders text-sky-400 mr-1"></i>รูปแบบการค้นหา</label>
+                            <select id="reportSearchType" onchange="onSearchTypeChange()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 font-medium">
+                                <option value="daily">📅 ค้นหารายวัน (Daily)</option>
+                                <option value="monthly">🗓️ ค้นหารายเดือน (Monthly)</option>
+                            </select>
+                        </div>
+
+                        <!-- Date Input (Daily) -->
+                        <div id="dailyDateContainer">
+                            <label class="block text-[11px] text-slate-400 mb-1 font-medium"><i class="fa-solid fa-calendar-day text-emerald-400 mr-1"></i>เลือกวันที่ค้นหา</label>
+                            <input type="date" id="reportDateInput" onchange="fetchDailyReportData()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+                        </div>
+
+                        <!-- Month Input (Monthly) -->
+                        <div id="monthlyDateContainer" class="hidden">
+                            <label class="block text-[11px] text-slate-400 mb-1 font-medium"><i class="fa-solid fa-calendar-days text-indigo-400 mr-1"></i>เลือกเดือนที่ค้นหา</label>
+                            <input type="month" id="reportMonthInput" onchange="fetchDailyReportData()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+
+                        <!-- Province Filter -->
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1 font-medium"><i class="fa-solid fa-filter text-sky-400 mr-1"></i>กลุ่ม ปจ. (กลุ่มจังหวัด)</label>
+                            <select id="reportProvinceFilter" onchange="renderDailyReportUI()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+                                <option value="ALL">-- แสดงทุกกลุ่มจังหวัด (8 จังหวัด) --</option>
+                                <option value="บึงกาฬ">บึงกาฬ</option>
+                                <option value="หนองบัวลำภู">หนองบัวลำภู</option>
+                                <option value="ขอนแก่น">ขอนแก่น</option>
+                                <option value="อุดรธานี">อุดรธานี</option>
+                                <option value="เลย">เลย</option>
+                                <option value="หนองคาย">หนองคาย</option>
+                                <option value="มหาสารคาม">มหาสารคาม</option>
+                                <option value="กาฬสินธุ์">กาฬสินธุ์</option>
+                            </select>
+                        </div>
+
+                        <!-- Filter Inactive Checkbox -->
+                        <div class="flex items-center pt-4 sm:pt-5">
+                            <label class="flex items-center space-x-1.5 cursor-pointer text-xs text-amber-300 font-medium select-none bg-amber-950/40 border border-amber-800/60 px-2.5 py-1.5 rounded-lg hover:bg-amber-950/70 transition">
+                                <input type="checkbox" id="onlyActiveVehiclesToggle" checked onchange="renderDailyReportUI()" class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-amber-500 w-3.5 h-3.5">
+                                <span><i class="fa-solid fa-eye-slash text-amber-400 mr-1"></i>ซ่อนรถที่ไม่วิ่ง (0 กม.)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <button onclick="fetchDailyReportData()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition shadow-lg shadow-emerald-600/20">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <span>ค้นหารายงาน</span>
+                        </button>
+                        <button onclick="exportDailyReportCSV()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition shadow-lg shadow-blue-600/20">
+                            <i class="fa-solid fa-file-csv"></i>
+                            <span>ส่งออก CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Summary KPI Cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-700">
+                        <span class="text-[11px] text-slate-400 block mb-0.5"><i class="fa-solid fa-truck text-emerald-400 mr-1"></i>รถที่ใช้งานในวันที่เลือก</span>
+                        <strong class="text-emerald-400 text-xl" id="reportActiveCount">0 คัน</strong>
+                    </div>
+                    <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-700">
+                        <span class="text-[11px] text-slate-400 block mb-0.5"><i class="fa-solid fa-route text-sky-400 mr-1"></i>ระยะทางวิ่งรวมทุกคัน</span>
+                        <strong class="text-sky-400 text-xl" id="reportTotalFleetKm">0.0 กม.</strong>
+                    </div>
+                    <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-700">
+                        <span class="text-[11px] text-slate-400 block mb-0.5"><i class="fa-solid fa-building text-amber-400 mr-1"></i>จำนวน ปจ./ปณ. ที่ใช้งาน</span>
+                        <strong class="text-amber-400 text-xl" id="reportOfficeCount">0 แห่ง</strong>
+                    </div>
+                    <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-700">
+                        <span class="text-[11px] text-slate-400 block mb-0.5"><i class="fa-solid fa-location-dot text-indigo-400 mr-1"></i>จำนวนจุด GPS รวม</span>
+                        <strong class="text-indigo-400 text-xl" id="reportTotalGpsPoints">0 จุด</strong>
+                    </div>
+                </div>
+
+                <!-- Distance Traveled Bar Chart by Office (Recharts) -->
+                <div class="bg-slate-900 rounded-xl border border-slate-700 p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-7 h-7 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs">
+                                <i class="fa-solid fa-chart-column"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-100 text-xs sm:text-sm">แผนภูมิระยะทางที่วิ่ง (Distance Traveled) แยกตามสำนักงาน</h4>
+                                <p class="text-[11px] text-slate-400">เปรียบเทียบระยะทางวิ่งรวม (กม.) ของแต่ละ ปจ./ปณ. ในช่วงเวลาที่เลือก</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] text-sky-400 bg-sky-950 px-2 py-0.5 rounded border border-sky-800 font-mono flex items-center space-x-1">
+                            <i class="fa-solid fa-chart-bar"></i>
+                            <span>Recharts Engine</span>
+                        </span>
+                    </div>
+
+                    <div id="rechartsChartRoot" class="w-full h-64 bg-slate-950/60 rounded-xl p-2 border border-slate-800 flex items-center justify-center">
+                        <span class="text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-sky-400"></i>กำลังเตรียมแผนภูมิระยะทาง...</span>
+                    </div>
+                </div>
+
+                <!-- Report Details Table -->
+                <div class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
+                    <div class="p-3 bg-slate-800/80 border-b border-slate-700 font-semibold text-xs text-slate-200 flex items-center justify-between">
+                        <span><i class="fa-solid fa-list-check text-emerald-400 mr-1.5"></i>รายงานสรุปการใช้รถประจำวันและเส้นทางวิ่ง</span>
+                        <div class="flex items-center space-x-2">
+                            <span id="reportDateBadge" class="text-[11px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800 font-mono">--/--/----</span>
+                            <button onclick="exportDailyReportCSV()" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg text-[11px] font-medium flex items-center space-x-1 transition shadow">
+                                <i class="fa-solid fa-download"></i>
+                                <span>ดาวน์โหลด CSV</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="max-h-96 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-800 text-slate-400 font-medium border-b border-slate-700 sticky top-0">
+                                <tr>
+                                    <th class="p-3">ทะเบียน / ชื่อรถ</th>
+                                    <th class="p-3">คนขับ</th>
+                                    <th class="p-3">ชื่อ ปจ./ปณ. (ที่ทำการ)</th>
+                                    <th class="p-3">กลุ่ม ปจ.</th>
+                                    <th class="p-3">ระยะทางวิ่งวันนี้</th>
+                                    <th class="p-3">ความเร็วสูงสุด</th>
+                                    <th class="p-3 text-center">ดูเส้นทาง</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dailyReportTableBody" class="divide-y divide-slate-800">
+                                <tr>
+                                    <td colspan="7" class="p-8 text-center text-slate-500">กรุณากดปุ่มค้นหาเพื่อแสดงรายงาน</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-slate-700 w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
-                <h3 class="font-bold text-slate-100 text-base"><i class="fa-solid fa-gear text-sky-400 mr-2"></i>ตั้งค่าการเชื่อมต่อ Supabase</h3>
-                <button onclick="toggleSettingsModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+    <!-- Login Modal -->
+    <div id="loginModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-lg rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-slate-900 border-b border-slate-700 p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xl">
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-100 text-base">เข้าสู่ระบบ Fleet Management</h3>
+                        <p class="text-xs text-slate-400">ระบุชื่อผู้ใช้ / รหัสไปรษณีย์ หรือสิทธิ์การใช้งานเพื่อเริ่มจัดการรถ</p>
+                    </div>
+                </div>
+                <button onclick="closeLoginModal()" class="text-slate-400 hover:text-white text-xl p-1"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
-            <div class="space-y-3 text-xs">
-                <div>
-                    <label class="block text-slate-300 mb-1 font-medium">Supabase URL</label>
-                    <input type="text" id="supabaseUrlInput" class="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-sky-500 font-mono text-xs">
+            <!-- Modal Content Body -->
+            <div class="p-5 space-y-4">
+                <!-- Username & Password Login Form -->
+                <form onsubmit="handleFormLogin(event)" class="bg-slate-900/90 border border-slate-700 p-4 rounded-xl space-y-3 shadow-xl">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <label class="text-xs font-bold text-sky-400 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            <span>เข้าสู่ระบบสำหรับผู้ดูแลระบบและผู้จัดการกลุ่มจังหวัด</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-slate-300 mb-1 block font-medium">ชื่อผู้ใช้งาน (Username / รหัสพื้นที่):</label>
+                        <input type="text" id="loginUsernameInput" placeholder="กรอก Username หรือ รหัสพื้นที่ (เช่น admin, 40000, 41000)" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500 font-mono">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-slate-300 mb-1 block font-medium">รหัสผ่าน (Password):</label>
+                        <input type="password" id="loginPasswordInput" placeholder="กรอกรหัสผ่านสำหรับยืนยันสิทธิ์" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500 font-mono">
+                    </div>
+                    
+                    <div id="loginErrorMsg" class="hidden text-xs bg-rose-950/80 border border-rose-600/50 text-rose-300 px-3 py-2 rounded-lg font-medium flex items-center space-x-1.5">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span id="loginErrorText">รหัสผ่านไม่ถูกต้อง!</span>
+                    </div>
+
+                    <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-2 shadow-lg shadow-sky-600/20">
+                        <i class="fa-solid fa-key"></i>
+                        <span>ยืนยันเข้าสู่ระบบ</span>
+                    </button>
+                    
+                    <div class="text-center pt-2 border-t border-slate-800/80">
+                        <p class="text-[11px] text-slate-400 leading-relaxed">
+                            💡 <span class="text-slate-300">สำหรับผู้ใช้งานทั่วไป (General User):</span> สามารถเข้าชมแผนที่ ข้อมูลรถ และรายงานได้ทันทีโดยไม่ต้องเข้าสู่ระบบ
+                        </p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Accounts Management Modal for Super Admin -->
+    <div id="userMgmtModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-3xl max-h-[92vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-slate-900 border-b border-slate-700 p-4 flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xl">
+                        <i class="fa-solid fa-users-gear"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-100 text-base">👥 ระบบจัดการบัญชีผู้จัดการและรหัสผ่าน (User & Password Management)</h3>
+                        <p class="text-xs text-slate-400">Super Admin สามารถเพิ่ม บันทึก เปลี่ยนรหัสผ่าน หรือลบบัญชีผู้จัดการกลุ่มจังหวัดได้ที่นี่</p>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-slate-300 mb-1 font-medium">Supabase Anon Key</label>
-                    <textarea id="supabaseKeyInput" rows="3" class="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-sky-500 font-mono text-[11px]"></textarea>
+                <button onclick="closeUserMgmtModal()" class="text-slate-400 hover:text-white text-xl p-1"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Add / Edit Account Form -->
+                <form onsubmit="saveUserAccountForm(event)" class="bg-slate-900 p-4 rounded-xl border border-purple-500/40 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-purple-300 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-user-plus"></i>
+                            <span id="userFormTitle">เพิ่ม / แก้ไข บัญชีผู้ใช้งาน Manager</span>
+                        </h4>
+                        <span class="text-[11px] text-slate-400">กรอกข้อมูลบัญชีเพื่อบันทึก</span>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[11px] text-slate-300 mb-1 block">Username (ชื่อเข้าใช้ / รหัสพื้นที่)*:</label>
+                            <input type="text" id="mgmtUsername" placeholder="เช่น 40000, 42000, manager_loei" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-purple-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-slate-300 mb-1 block">Password (รหัสผ่าน)*:</label>
+                            <input type="text" id="mgmtPassword" placeholder="เช่น pass40000, secret123" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-purple-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-slate-300 mb-1 block">ชื่อผู้ใช้งาน (Display Name)*:</label>
+                            <input type="text" id="mgmtName" placeholder="เช่น User Manager (ขอนแก่น)" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-slate-300 mb-1 block">กลุ่มจังหวัด (Province Group)*:</label>
+                            <input type="text" id="mgmtProvince" placeholder="เช่น ขอนแก่น, เลย, หนองบัวลำภู" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end space-x-2 pt-1">
+                        <button type="button" onclick="resetMgmtForm()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition">ล้างฟอร์ม</button>
+                        <button type="submit" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-lg shadow-lg shadow-purple-600/20 transition flex items-center space-x-1.5">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>บันทึกบัญชี / Update Account</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Registered Accounts List -->
+                <div class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
+                    <div class="p-3 bg-slate-800/80 border-b border-slate-700 flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-list-check text-sky-400"></i>
+                            <span>รายการบัญชีผู้ใช้ระบบทั้งหมด (Active Accounts)</span>
+                        </h4>
+                        <span class="text-[11px] text-slate-400">บันทึกข้อมูลเรียลไทม์</span>
+                    </div>
+
+                    <div class="overflow-x-auto max-h-[320px] overflow-y-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-800 text-slate-400 sticky top-0 font-medium border-b border-slate-700">
+                                <tr>
+                                    <th class="p-2.5">Username</th>
+                                    <th class="p-2.5">ชื่อแสดง / สิทธิ์</th>
+                                    <th class="p-2.5">กลุ่มจังหวัด</th>
+                                    <th class="p-2.5">Password</th>
+                                    <th class="p-2.5 text-center">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userMgmtTbody" class="divide-y divide-slate-800">
+                                <!-- Populated via JS renderUserMgmtTable() -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Vehicle & Driver Management Modal -->
+    <div id="adminModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-5xl h-[92vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-slate-900 border-b border-slate-700 p-4 flex flex-col md:flex-row md:items-center justify-between gap-2 shrink-0">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xl">
+                        <i class="fa-solid fa-user-gear"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-100 text-base flex items-center gap-2 flex-wrap">
+                            <span>⚙️ ระบบจัดการข้อมูลยานพาหนะ</span>
+                            <span id="adminRoleBadge" class="text-[10px] px-2 py-0.5 rounded-full font-bold"></span>
+                        </h3>
+                        <p id="adminRoleDesc" class="text-xs text-slate-400">แก้ไขข้อมูลทะเบียน ชื่อรถ คนขับ สำนักงาน กลุ่มจังหวัด และสถานะการเปิด/ปิดใช้งาน</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button id="adminUserMgmtBtn" onclick="openUserMgmtModal()" class="hidden text-xs bg-purple-900/90 hover:bg-purple-800 text-purple-200 border border-purple-500/50 px-2.5 py-1.5 rounded-lg transition flex items-center space-x-1">
+                        <i class="fa-solid fa-users-gear"></i>
+                        <span>จัดการบัญชีผู้จัดการ</span>
+                    </button>
+                    <button onclick="openLoginModal()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-lg transition flex items-center space-x-1">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                        <span>สลับผู้ใช้งาน</span>
+                    </button>
+                    <button onclick="closeAdminModal()" class="text-slate-400 hover:text-white text-xl p-1"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
 
-            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-700">
-                <button onclick="toggleSettingsModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-medium">ยกเลิก</button>
-                <button onclick="saveSettings()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-medium">บันทึกและเชื่อมต่อ</button>
+            <!-- Modal Content Body -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Search & Actions Bar -->
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                        <input type="text" id="adminSearchInput" oninput="renderAdminVehicleList()" placeholder="ค้นหาทะเบียน, ชื่อรถ, คนขับ, สำนักงาน..." class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="openAddNewVehicleModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>เพิ่มรถใหม่</span>
+                        </button>
+                        <button onclick="fetchVehiclesData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1 transition">
+                            <i class="fa-solid fa-rotate"></i>
+                            <span>รีเฟรชข้อมูล</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Vehicles Table -->
+                <div class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
+                    <div class="max-h-[60vh] overflow-y-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-800 text-slate-400 font-medium border-b border-slate-700 sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-3">ทะเบียนรถ</th>
+                                    <th class="p-3">ชื่อรถ</th>
+                                    <th class="p-3">ชื่อคนขับ</th>
+                                    <th class="p-3">สำนักงาน (ปจ./ปณ.)</th>
+                                    <th class="p-3">กลุ่ม ปจ.</th>
+                                    <th class="p-3 text-center">สถานะ</th>
+                                    <th class="p-3 text-center">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminTableBody" class="divide-y divide-slate-800">
+                                <tr>
+                                    <td colspan="7" class="p-8 text-center text-slate-500">กำลังโหลดข้อมูล...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- JavaScript Application Logic -->
     <script>
-        let DEFAULT_SUPABASE_URL = "https://rhzglphlfzhautvwpnae.supabase.co";
-        let DEFAULT_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJoemdscGhsZnpoYXV0dndwbmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4OTQzNDUsImV4cCI6MjEwMTQ3MDM0NX0.JMx8DvXgES0x9N7YmjW2n_7mgMYm_bgAkv39xb_Q2Jo";
+        const DEFAULT_SUPABASE_URL = "https://rhzglphlfzhautvwpnae.supabase.co";
+        const DEFAULT_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJoemdscGhsZnpoYXV0dndwbmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4OTQzNDUsImV4cCI6MjEwMTQ3MDM0NX0.JMx8DvXgES0x9N7YmjW2n_7mgMYm_bgAkv39xb_Q2Jo";
 
         let supabaseUrl = localStorage.getItem("sp_url") || DEFAULT_SUPABASE_URL;
         let supabaseKey = localStorage.getItem("sp_key") || DEFAULT_ANON_KEY;
 
-        document.getElementById("supabaseUrlInput").value = supabaseUrl;
-        document.getElementById("supabaseKeyInput").value = supabaseKey;
+        // Map Tile Layers Configuration
+        const streetTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        });
+
+        const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        });
+
+        const satelliteTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '&copy; Esri, Maxar'
+        });
+
+        const hybridLabelsTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            opacity: 0.95
+        });
+
+        const hybridGroup = L.layerGroup([satelliteTile, hybridLabelsTile]);
 
         // Initialize Leaflet Map centered on Thailand
-        const map = L.map('map').setView([15.8700, 100.9925], 6);
+        const map = L.map('map', {
+            center: [15.8700, 100.9925],
+            zoom: 6,
+            layers: [streetTile]
+        });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        let currentTileLayer = streetTile;
+
+        // Leaflet Native Control
+        const baseMaps = {
+            "🗺️ แผนที่ถนน (Street)": streetTile,
+            "🌙 โหมดมืด (Dark Mode)": darkTile,
+            "🛰️ ภาพดาวเทียม (Satellite)": satelliteTile,
+            "🛰️ ดาวเทียม + ถนน (Hybrid)": hybridGroup
+        };
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+        function switchMapLayer(layerType) {
+            map.removeLayer(currentTileLayer);
+            if (layerType === 'dark') {
+                currentTileLayer = darkTile;
+            } else if (layerType === 'satellite') {
+                currentTileLayer = satelliteTile;
+            } else if (layerType === 'hybrid') {
+                currentTileLayer = hybridGroup;
+            } else {
+                currentTileLayer = streetTile;
+            }
+            map.addLayer(currentTileLayer);
+
+            ['street', 'dark', 'satellite', 'hybrid'].forEach(type => {
+                const btn = document.getElementById(`btn-layer-${type}`);
+                if (btn) {
+                    if (type === layerType) {
+                        btn.className = "px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-600 text-white shadow transition flex items-center space-x-1";
+                    } else {
+                        btn.className = "px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center space-x-1";
+                    }
+                }
+            });
+        }
 
         let vehicleMarkers = {};
         let vehiclesData = [];
+        let vehicleDistancesKm = {};
+        let vehicleLocationNames = {};
+        let placeNameCache = {};
         let selectedVehicleId = null;
-        let historyPolyline = null;
+        let isAutoFollowEnabled = false;
+        let isGroupedByProvince = false;
+        let expandedGroups = new Set();
+        let userInteractedAccordion = false;
+        let mobileActiveTab = 'map';
 
+        function switchMobileTab(tab) {
+            mobileActiveTab = tab;
+            const sidebar = document.getElementById("sidebar");
+            const mapContainer = document.getElementById("mapContainer");
+            const mobileBtnList = document.getElementById("mobileBtnList");
+            const mobileBtnMap = document.getElementById("mobileBtnMap");
+
+            if (tab === 'list') {
+                if (sidebar) {
+                    sidebar.classList.remove("hidden");
+                    sidebar.classList.add("flex");
+                }
+                if (mapContainer) {
+                    mapContainer.classList.add("hidden");
+                    mapContainer.classList.remove("flex");
+                }
+                if (mobileBtnList) {
+                    mobileBtnList.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 bg-sky-600 text-white shadow-lg shadow-sky-600/20";
+                }
+                if (mobileBtnMap) {
+                    mobileBtnMap.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 bg-slate-800 text-slate-300 border border-slate-700 hover:text-white";
+                }
+            } else {
+                if (sidebar) {
+                    sidebar.classList.add("hidden");
+                    sidebar.classList.remove("flex");
+                }
+                if (mapContainer) {
+                    mapContainer.classList.remove("hidden");
+                    mapContainer.classList.add("flex");
+                }
+                if (mobileBtnList) {
+                    mobileBtnList.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 bg-slate-800 text-slate-300 border border-slate-700 hover:text-white";
+                }
+                if (mobileBtnMap) {
+                    mobileBtnMap.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 bg-sky-600 text-white shadow-lg shadow-sky-600/20";
+                }
+                setTimeout(() => {
+                    if (map) map.invalidateSize();
+                }, 150);
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            const sidebar = document.getElementById("sidebar");
+            const mapContainer = document.getElementById("mapContainer");
+            if (window.innerWidth >= 768) {
+                if (sidebar) {
+                    sidebar.classList.remove("hidden");
+                    sidebar.classList.add("flex");
+                }
+                if (mapContainer) {
+                    mapContainer.classList.remove("hidden");
+                    mapContainer.classList.add("flex");
+                }
+            } else {
+                switchMobileTab(mobileActiveTab);
+            }
+            if (map) map.invalidateSize();
+        });
+
+        function updateMobileTrackingCard() {
+            const card = document.getElementById("mobileVehicleTrackingCard");
+            if (!card) return;
+
+            if (!selectedVehicleId) {
+                card.classList.add("hidden");
+                return;
+            }
+
+            const v = vehiclesData.find(item => item.vehicle_id === selectedVehicleId);
+            if (!v) {
+                card.classList.add("hidden");
+                return;
+            }
+
+            const isMoving = (v.status || '').includes("MOVING") || (v.speed_kmh || 0) > 3;
+            const statusBadge = isMoving 
+                ? `<span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold text-[10px] animate-pulse"><i class="fa-solid fa-circle text-[6px] mr-1"></i>วิ่งอยู่ ${v.speed_kmh || 0} km/h</span>`
+                : `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold text-[10px]"><i class="fa-solid fa-parking mr-1"></i>จอดพัก / IDLE</span>`;
+
+            const distanceKm = (vehicleDistancesKm[v.vehicle_id] || 0.0).toFixed(1);
+            const placeName = vehicleLocationNames[v.vehicle_id] || `พิกัด ${(v.latitude || 0).toFixed(4)}, ${(v.longitude || 0).toFixed(4)}`;
+
+            card.innerHTML = `
+                <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                    <div class="flex items-center space-x-2 truncate">
+                        <div class="w-7 h-7 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold shrink-0">
+                            <i class="fa-solid fa-truck-fast text-xs"></i>
+                        </div>
+                        <div class="truncate">
+                            <h4 class="font-bold text-white text-xs truncate">${v.vehicle_name || v.vehicle_id} <span class="text-[10px] text-slate-400">(${v.license_plate || '-'})</span></h4>
+                            <p class="text-[10px] text-slate-400 truncate">คนขับ: ${v.driver_name || '-'} • ${v.office_name || v.province_group || ''}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-1 shrink-0">
+                        ${statusBadge}
+                        <button onclick="deselectVehicle()" class="text-slate-400 hover:text-white p-1 ml-1 text-sm" title="ปิด"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-[11px] text-slate-300">
+                    <div class="truncate pr-2" title="${placeName}">
+                        <i class="fa-solid fa-location-dot text-rose-400 mr-1"></i>
+                        <span class="text-slate-200 font-medium">${placeName}</span>
+                    </div>
+                    <div class="shrink-0 text-sky-400 font-mono font-bold">
+                        <i class="fa-solid fa-route mr-1"></i>${distanceKm} กม.
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-1.5 pt-1">
+                    <button onclick="toggleAutoFollow(!isAutoFollowEnabled)" class="py-1.5 px-2 ${isAutoFollowEnabled ? 'bg-sky-600 text-white font-bold' : 'bg-slate-800 text-sky-400 border border-slate-700'} hover:bg-sky-500 hover:text-white rounded-lg text-[10px] transition flex items-center justify-center space-x-1">
+                        <i class="fa-solid fa-crosshairs"></i>
+                        <span>${isAutoFollowEnabled ? 'กำลังติดตาม' : 'ติดตามรถ'}</span>
+                    </button>
+                    <button onclick="centerOnSelectedVehicle()" class="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[10px] transition flex items-center justify-center space-x-1">
+                        <i class="fa-solid fa-magnifying-glass-location"></i>
+                        <span>ซูมใกล้</span>
+                    </button>
+                    <button onclick="openVehicleHistoryModal('${v.vehicle_id}')" class="py-1.5 px-2 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-500/30 rounded-lg text-[10px] font-semibold transition flex items-center justify-center space-x-1">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>ดูประวัติ</span>
+                    </button>
+                </div>
+            `;
+
+            card.classList.remove("hidden");
+        }
+
+        function deselectVehicle() {
+            selectedVehicleId = null;
+            isAutoFollowEnabled = false;
+            const autoFollowToggle = document.getElementById("autoFollowToggle");
+            if (autoFollowToggle) autoFollowToggle.checked = false;
+            updateMobileTrackingCard();
+            updateUI(vehiclesData);
+        }
+
+        function centerOnSelectedVehicle() {
+            if (!selectedVehicleId) return;
+            const v = vehiclesData.find(item => item.vehicle_id === selectedVehicleId);
+            if (v && v.latitude && v.longitude) {
+                map.flyTo([v.latitude, v.longitude], 16, { duration: 1.0 });
+            }
+        }
+
+        function toggleGroupByProvince(enabled) {
+            isGroupedByProvince = enabled;
+            const badge = document.getElementById("groupCountBadge");
+            if (badge) {
+                if (enabled) badge.classList.remove("hidden");
+                else badge.classList.add("hidden");
+            }
+            updateUI(vehiclesData);
+        }
+
+        function toggleAccordionGroup(groupName) {
+            userInteractedAccordion = true;
+            if (expandedGroups.has(groupName)) {
+                expandedGroups.delete(groupName);
+            } else {
+                expandedGroups.add(groupName);
+            }
+            updateUI(vehiclesData);
+        }
+
+        function toggleAutoFollow(enabled) {
+            isAutoFollowEnabled = enabled;
+            const icon = document.getElementById("autoFollowIcon");
+            if (icon) {
+                if (enabled) {
+                    icon.className = "fa-solid fa-crosshairs text-sky-400 text-xs animate-pulse";
+                } else {
+                    icon.className = "fa-solid fa-crosshairs text-slate-400 text-xs";
+                }
+            }
+            if (isAutoFollowEnabled && selectedVehicleId) {
+                centerOnSelectedVehicle();
+            }
+        }
+
+        // Adjust map bounds to encompass all visible vehicle markers
+        function fitMapBoundsAllVehicles() {
+            const searchInput = document.getElementById("searchInput");
+            const searchVal = searchInput ? searchInput.value.toLowerCase() : "";
+
+            let targetVehicles = vehiclesData;
+            if (searchVal) {
+                targetVehicles = targetVehicles.filter(v => 
+                    (v.vehicle_name || '').toLowerCase().includes(searchVal) ||
+                    (v.license_plate || '').toLowerCase().includes(searchVal) ||
+                    (v.driver_name || '').toLowerCase().includes(searchVal) ||
+                    (v.province_group || '').toLowerCase().includes(searchVal) ||
+                    (v.office_name || '').toLowerCase().includes(searchVal)
+                );
+            }
+
+            const validCoords = targetVehicles
+                .filter(v => v.latitude && v.longitude)
+                .map(v => [v.latitude, v.longitude]);
+
+            if (validCoords.length === 0) {
+                alert("ไม่พบตำแหน่งรถบนแผนที่ในขณะนี้");
+                return;
+            }
+
+            if (validCoords.length === 1) {
+                map.flyTo(validCoords[0], 14, { duration: 1 });
+            } else {
+                const bounds = L.latLngBounds(validCoords);
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15, animate: true });
+            }
+        }
+
+        // Playback state variables
+        let currentHistoryPoints = [];
+        let currentHistoryIndex = 0;
+        let isPlaybackPlaying = false;
+        let playbackInterval = null;
+        let playbackMarker = null;
+        let mainPolyline = null;
+
+        // --- Distance Calculation Function (Haversine Formula) ---
+        function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function calculateTodayDistanceKm(points) {
+            if (!points || points.length < 2) return 0.0;
+            let totalKm = 0.0;
+            for (let i = 1; i < points.length; i++) {
+                const p1 = points[i - 1];
+                const p2 = points[i];
+                if (p1.latitude && p1.longitude && p2.latitude && p2.longitude) {
+                    const dist = getDistanceFromLatLonInKm(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
+                    if (dist < 50) { // filter out GPS jitter glitches
+                        totalKm += dist;
+                    }
+                }
+            }
+            return totalKm;
+        }
+
+        // --- Reverse Geocoding for Place Names ---
+        async function getPlaceName(lat, lng) {
+            if (!lat || !lng) return "ไม่ระบุตำแหน่ง";
+            const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+            if (placeNameCache[key]) return placeNameCache[key];
+
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const addr = data.address || {};
+                    const place = addr.suburb || addr.town || addr.city || addr.district || addr.county || addr.state || data.display_name.split(',')[0];
+                    const province = addr.state || addr.province || '';
+                    const result = province && !place.includes(province) ? `${place}, ${province}` : place;
+                    placeNameCache[key] = result;
+                    return result;
+                }
+            } catch (e) {
+                console.warn("Reverse geocode error:", e);
+            }
+            const fallback = `พิกัด ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            placeNameCache[key] = fallback;
+            return fallback;
+        }
+
+        // --- Fetch Vehicles & Telemetry from Supabase ---
         async function fetchVehiclesData() {
             try {
                 const cleanedUrl = supabaseUrl.trim().replace(/\/$/, "");
@@ -183,14 +1064,80 @@
                 if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
                 
                 vehiclesData = await res.json();
-                updateUI(vehiclesData);
 
+                // Fetch telemetry history for each vehicle to calculate distance and location name
+                for (const v of vehiclesData) {
+                    if (v.vehicle_id) {
+                        try {
+                            const histRes = await fetch(`${cleanedUrl}/rest/v1/telemetry_history?vehicle_id=eq.${v.vehicle_id}&order=created_at.asc&limit=200`, {
+                                headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+                            });
+                            if (histRes.ok) {
+                                const hist = await histRes.json();
+                                vehicleDistancesKm[v.vehicle_id] = calculateTodayDistanceKm(hist);
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (v.latitude && v.longitude) {
+                        getPlaceName(v.latitude, v.longitude).then(name => {
+                            vehicleLocationNames[v.vehicle_id] = name;
+                            const el = document.getElementById(`loc-name-${v.vehicle_id}`);
+                            if (el) el.innerText = name;
+                        });
+                    }
+                }
+
+                updateUI(vehiclesData);
                 document.getElementById("lastUpdated").innerText = new Date().toLocaleTimeString('th-TH');
             } catch (err) {
                 console.error("Fetch vehicles error:", err);
             }
         }
 
+        function renderVehicleCardHTML(v) {
+            const isMoving = (v.status || '').includes("MOVING") || (v.speed_kmh || 0) > 3;
+            const statusColor = isMoving ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30";
+            const isSelected = selectedVehicleId === v.vehicle_id;
+            const distanceKm = (vehicleDistancesKm[v.vehicle_id] || 0.0).toFixed(1);
+            const placeName = vehicleLocationNames[v.vehicle_id] || `กำลังค้นหาสถานที่ (${(v.latitude || 0).toFixed(3)}, ${(v.longitude || 0).toFixed(3)})`;
+
+            return `
+                <div class="p-3 rounded-xl border transition ${isSelected ? 'bg-sky-950/80 border-sky-500' : 'bg-slate-900 border-slate-700/80 hover:border-slate-600'}">
+                    <div class="flex items-center justify-between mb-1.5 cursor-pointer" onclick="selectVehicle('${v.vehicle_id}')">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-car-side text-sky-400"></i>
+                            <span class="font-bold text-slate-100 text-sm">${v.vehicle_name || v.vehicle_id}</span>
+                            <span class="text-[11px] text-slate-400">(${v.license_plate || '-'})</span>
+                        </div>
+                        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusColor}">
+                            ${v.status || (isMoving ? 'MOVING' : 'IDLE')}
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mt-2 text-[11px] text-slate-300 bg-slate-800/50 p-2 rounded-lg cursor-pointer" onclick="selectVehicle('${v.vehicle_id}')">
+                        <div><i class="fa-solid fa-gauge text-amber-400 mr-1"></i>ความเร็ว: <strong class="text-white">${v.speed_kmh || 0} km/h</strong></div>
+                        <div><i class="fa-solid fa-user-gear text-indigo-400 mr-1"></i>คนขับ: <span class="text-slate-200">${v.driver_name || '-'}</span></div>
+                        <div><i class="fa-solid fa-building text-emerald-400 mr-1"></i>ที่ทำการ: <span class="text-slate-200">${v.office_name || '-'}</span></div>
+                        <div><i class="fa-solid fa-map-location-dot text-indigo-400 mr-1"></i>กลุ่ม ปจ.: <span class="text-slate-200">${v.province_group || '-'}</span></div>
+                        <div class="col-span-2 text-sky-400 font-medium pt-0.5 border-t border-slate-700/50">
+                            <i class="fa-solid fa-route text-sky-400 mr-1"></i>ระยะทางวันนี้: <strong class="text-white">${distanceKm} กม.</strong>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between mt-2 text-[10px] text-slate-400 pt-1.5 border-t border-slate-800">
+                        <span class="truncate pr-2" title="${placeName}">
+                            <i class="fa-solid fa-location-dot text-rose-400 mr-1"></i><span id="loc-name-${v.vehicle_id}">${placeName}</span>
+                        </span>
+                        <button onclick="openVehicleHistoryModal('${v.vehicle_id}')" class="text-sky-400 hover:text-sky-300 font-semibold flex items-center shrink-0">
+                            <span>ดูประวัติ</span> <i class="fa-solid fa-chevron-right text-[9px] ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Render Sidebar Vehicles List & Map Markers ---
         function updateUI(vehicles) {
             const listEl = document.getElementById("vehicleList");
             const searchVal = document.getElementById("searchInput").value.toLowerCase();
@@ -198,53 +1145,73 @@
             const filtered = vehicles.filter(v => 
                 (v.vehicle_name || '').toLowerCase().includes(searchVal) ||
                 (v.license_plate || '').toLowerCase().includes(searchVal) ||
-                (v.driver_name || '').toLowerCase().includes(searchVal)
+                (v.driver_name || '').toLowerCase().includes(searchVal) ||
+                (v.province_group || '').toLowerCase().includes(searchVal) ||
+                (v.office_name || '').toLowerCase().includes(searchVal)
             );
 
             document.getElementById("totalVehiclesCount").innerText = vehicles.length;
+            const mobCountEl = document.getElementById("mobileTotalCount");
+            if (mobCountEl) mobCountEl.innerText = vehicles.length;
+
             document.getElementById("movingCount").innerText = vehicles.filter(v => (v.status || '').includes("MOVING") || (v.speed_kmh || 0) > 3).length;
             document.getElementById("idleCount").innerText = vehicles.filter(v => !(v.status || '').includes("MOVING") && (v.speed_kmh || 0) <= 3).length;
 
             if (filtered.length === 0) {
                 listEl.innerHTML = `<div class="text-center py-10 text-slate-500 text-xs">ไม่พบข้อมูลรถตรงกับคำค้นหา</div>`;
+                updateMobileTrackingCard();
                 return;
             }
 
-            listEl.innerHTML = filtered.map(v => {
-                const isMoving = (v.status || '').includes("MOVING") || (v.speed_kmh || 0) > 3;
-                const statusColor = isMoving ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30";
-                const isSelected = selectedVehicleId === v.vehicle_id;
+            if (!isGroupedByProvince) {
+                listEl.innerHTML = filtered.map(v => renderVehicleCardHTML(v)).join('');
+            } else {
+                // Group vehicles by province_group
+                const groups = {};
+                filtered.forEach(v => {
+                    const gName = (v.province_group || 'อื่นๆ / ไม่ระบุกลุ่ม').trim();
+                    if (!groups[gName]) groups[gName] = [];
+                    groups[gName].push(v);
+                });
 
-                return `
-                    <div onclick="selectVehicle('${v.vehicle_id}')" 
-                         class="p-3 rounded-xl border transition cursor-pointer ${isSelected ? 'bg-sky-950/80 border-sky-500' : 'bg-slate-900 border-slate-700/80 hover:border-slate-600'}">
-                        <div class="flex items-center justify-between mb-1.5">
-                            <div class="flex items-center space-x-2">
-                                <i class="fa-solid fa-car-side text-sky-400"></i>
-                                <span class="font-bold text-slate-100 text-sm">${v.vehicle_name || v.vehicle_id}</span>
-                                <span class="text-[11px] text-slate-400">(${v.license_plate || '-'})</span>
+                const sortedGroupNames = Object.keys(groups).sort();
+
+                // If searching or first load without user interaction, auto-expand all active groups
+                if (searchVal.length > 0) {
+                    sortedGroupNames.forEach(g => expandedGroups.add(g));
+                } else if (expandedGroups.size === 0 && !userInteractedAccordion) {
+                    sortedGroupNames.forEach(g => expandedGroups.add(g));
+                }
+
+                const badge = document.getElementById("groupCountBadge");
+                if (badge) badge.innerText = `${sortedGroupNames.length} กลุ่ม`;
+
+                listEl.innerHTML = sortedGroupNames.map(groupName => {
+                    const items = groups[groupName];
+                    const isExpanded = expandedGroups.has(groupName);
+                    const movingCount = items.filter(v => (v.status || '').includes("MOVING") || (v.speed_kmh || 0) > 3).length;
+                    const escapedGroupName = groupName.replace(/'/g, "\\'");
+
+                    return `
+                        <div class="rounded-xl border border-slate-700/80 overflow-hidden bg-slate-900/90 shadow-md">
+                            <button onclick="toggleAccordionGroup('${escapedGroupName}')" class="w-full px-3 py-2 bg-slate-800/90 hover:bg-slate-800 flex items-center justify-between text-xs font-semibold text-slate-200 border-b border-slate-700/60 transition select-none">
+                                <div class="flex items-center space-x-2 truncate">
+                                    <i class="fa-solid fa-map-location-dot text-sky-400 text-xs"></i>
+                                    <span class="truncate text-slate-100 font-bold">${groupName}</span>
+                                    <span class="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded-full font-mono">${items.length} คัน</span>
+                                    ${movingCount > 0 ? `<span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded-full font-mono"><i class="fa-solid fa-circle text-[6px] mr-1"></i>วิ่ง ${movingCount}</span>` : ''}
+                                </div>
+                                <i class="fa-solid ${isExpanded ? 'fa-chevron-up text-sky-400' : 'fa-chevron-down text-slate-400'} text-xs ml-2"></i>
+                            </button>
+                            <div class="${isExpanded ? 'block' : 'hidden'} p-2 space-y-2 bg-slate-950/40">
+                                ${items.map(v => renderVehicleCardHTML(v)).join('')}
                             </div>
-                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusColor}">
-                                ${v.status || (isMoving ? 'MOVING' : 'IDLE')}
-                            </span>
                         </div>
+                    `;
+                }).join('');
+            }
 
-                        <div class="grid grid-cols-2 gap-2 mt-2 text-[11px] text-slate-300 bg-slate-800/50 p-2 rounded-lg">
-                            <div><i class="fa-solid fa-gauge text-amber-400 mr-1"></i>ความเร็ว: <strong class="text-white">${v.speed_kmh || 0} km/h</strong></div>
-                            <div><i class="fa-solid fa-user-gear text-indigo-400 mr-1"></i>คนขับ: <span class="text-slate-200">${v.driver_name || '-'}</span></div>
-                            <div><i class="fa-solid fa-gas-pump text-emerald-400 mr-1"></i>น้ำมัน: <span class="text-slate-200">${v.fuel_percent || 0}%</span></div>
-                            <div><i class="fa-solid fa-car-battery text-rose-400 mr-1"></i>แบต: <span class="text-slate-200">${v.battery_voltage || 12.6}V</span></div>
-                        </div>
-
-                        <div class="flex items-center justify-between mt-2 text-[10px] text-slate-400 pt-1.5 border-t border-slate-800">
-                            <span><i class="fa-solid fa-location-dot text-rose-400 mr-1"></i>${(v.latitude || 0).toFixed(4)}, ${(v.longitude || 0).toFixed(4)}</span>
-                            <span class="text-sky-400 hover:underline">ดูประวัติเส้นทาง &rarr;</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            // Update Map Markers
+            // Update Leaflet Map Markers
             vehicles.forEach(v => {
                 if (!v.latitude || !v.longitude) return;
 
@@ -264,6 +1231,8 @@
                     iconAnchor: [18, 18]
                 });
 
+                const placeName = vehicleLocationNames[v.vehicle_id] || `${v.latitude.toFixed(4)}, ${v.longitude.toFixed(4)}`;
+
                 if (vehicleMarkers[v.vehicle_id]) {
                     vehicleMarkers[v.vehicle_id].setLatLng([v.latitude, v.longitude]);
                     vehicleMarkers[v.vehicle_id].setIcon(customIcon);
@@ -274,78 +1243,1358 @@
                             <strong class="text-sm text-sky-600 font-bold">${v.vehicle_name || v.vehicle_id}</strong><br>
                             <span class="text-xs text-slate-600">ทะเบียน: ${v.license_plate || '-'}</span><br>
                             <span class="text-xs font-semibold text-emerald-600">ความเร็ว: ${v.speed_kmh || 0} km/h</span><br>
-                            <span class="text-[11px] text-slate-500">คนขับ: ${v.driver_name || '-'}</span>
+                            <span class="text-[11px] text-slate-500">คนขับ: ${v.driver_name || '-'}</span><br>
+                            <span class="text-[11px] text-indigo-600">สถานที่: ${placeName}</span>
                         </div>
                     `);
+                    marker.on('click', () => {
+                        selectVehicle(v.vehicle_id);
+                    });
                     vehicleMarkers[v.vehicle_id] = marker;
                 }
             });
+
+            // Auto-follow selected vehicle during real-time tracking updates
+            if (isAutoFollowEnabled && selectedVehicleId) {
+                const selVehicle = vehicles.find(item => item.vehicle_id === selectedVehicleId);
+                if (selVehicle && selVehicle.latitude && selVehicle.longitude) {
+                    map.panTo([selVehicle.latitude, selVehicle.longitude], { animate: true });
+                }
+            }
+
+            updateMobileTrackingCard();
         }
 
-        async function selectVehicle(vehicleId) {
+        // --- Select Vehicle & Focus Map ---
+        function selectVehicle(vehicleId) {
             selectedVehicleId = vehicleId;
             const vehicle = vehiclesData.find(v => v.vehicle_id === vehicleId);
 
             if (vehicle && vehicle.latitude && vehicle.longitude) {
-                map.flyTo([vehicle.latitude, vehicle.longitude], 14, { duration: 1.2 });
+                map.flyTo([vehicle.latitude, vehicle.longitude], 15, { duration: 1.2 });
                 if (vehicleMarkers[vehicleId]) {
                     vehicleMarkers[vehicleId].openPopup();
                 }
             }
-
-            fetchVehicleHistory(vehicleId);
+            if (window.innerWidth < 768) {
+                switchMobileTab('map');
+            }
             updateUI(vehiclesData);
+            updateMobileTrackingCard();
         }
 
-        async function fetchVehicleHistory(vehicleId) {
+        // --- History Modal & Playback Logic ---
+        let playbackSpeed = 1;
+
+        async function openVehicleHistoryModal(vehicleId) {
+            selectedVehicleId = vehicleId;
+            const vehicle = vehiclesData.find(v => v.vehicle_id === vehicleId);
+
+            document.getElementById("historyModalTitle").innerText = `ประวัติเส้นทาง: ${vehicle?.vehicle_name || vehicleId} (${vehicle?.license_plate || '-'})`;
+            document.getElementById("historyModalSub").innerText = `คนขับ: ${vehicle?.driver_name || '-'} • ประจำวันนี้`;
+            
+            if (typeof switchMobileTab === 'function') {
+                switchMobileTab('map');
+            }
+            toggleHistoryModal(true);
+
+            // Fetch Telemetry History for this vehicle
             try {
                 const cleanedUrl = supabaseUrl.trim().replace(/\/$/, "");
-                const res = await fetch(`${cleanedUrl}/rest/v1/telemetry_history?vehicle_id=eq.${vehicleId}&order=created_at.asc&limit=100`, {
-                    headers: {
-                        'apikey': supabaseKey,
-                        'Authorization': `Bearer ${supabaseKey}`
-                    }
+                const res = await fetch(`${cleanedUrl}/rest/v1/telemetry_history?vehicle_id=eq.${vehicleId}&order=created_at.asc&limit=200`, {
+                    headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
                 });
 
-                if (!res.ok) return;
-                const history = await res.json();
-
-                if (historyPolyline) map.removeLayer(historyPolyline);
-
-                if (history.length > 1) {
-                    const latLngs = history.map(h => [h.latitude, h.longitude]);
-                    historyPolyline = L.polyline(latLngs, {
-                        color: '#38BDF8',
-                        weight: 4,
-                        opacity: 0.8,
-                        dashArray: '8, 8'
-                    }).addTo(map);
+                if (res.ok) {
+                    currentHistoryPoints = await res.json();
+                    renderHistoryData(currentHistoryPoints);
                 }
             } catch (err) {
-                console.error("History fetch error:", err);
+                console.error("Fetch history error:", err);
             }
+        }
+
+        function toggleHistoryLogDrawer() {
+            const drawer = document.getElementById("historyLogDrawer");
+            if (drawer) drawer.classList.toggle("hidden");
+        }
+
+        function cyclePlaybackSpeed() {
+            if (playbackSpeed === 1) playbackSpeed = 2;
+            else if (playbackSpeed === 2) playbackSpeed = 4;
+            else playbackSpeed = 1;
+
+            const speedBtn = document.getElementById("playbackSpeedBtn");
+            if (speedBtn) speedBtn.innerText = `⚡ ${playbackSpeed}x`;
+
+            if (isPlaybackPlaying) {
+                pausePlayback();
+                startPlayback();
+            }
+        }
+
+        function centerPlaybackMarker() {
+            if (currentHistoryPoints && currentHistoryPoints[currentHistoryIndex]) {
+                const pt = currentHistoryPoints[currentHistoryIndex];
+                map.flyTo([pt.latitude, pt.longitude], 15, { animate: true });
+            }
+        }
+
+        function closeHistoryMode() {
+            pausePlayback();
+            toggleHistoryModal(false);
+            if (mainPolyline) { map.removeLayer(mainPolyline); mainPolyline = null; }
+            if (playbackMarker) { map.removeLayer(playbackMarker); playbackMarker = null; }
+        }
+
+        function renderHistoryData(points) {
+            const tableBody = document.getElementById("historyTableBody");
+            const slider = document.getElementById("playbackSlider");
+
+            if (!points || points.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-500">ไม่มีข้อมูลประวัติการเดินทางของคันนี้</td></tr>`;
+                document.getElementById("histTotalKm").innerText = "0.0 กม.";
+                document.getElementById("histMaxSpeed").innerText = "0 km/h";
+                document.getElementById("histPointCount").innerText = "0 จุด";
+                document.getElementById("histTimeRange").innerText = "--:--";
+                return;
+            }
+
+            const totalKm = calculateTodayDistanceKm(points);
+            const maxSpd = Math.max(...points.map(p => p.speed_kmh || 0));
+            const startTime = points[0].created_at ? new Date(points[0].created_at).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}) : '--:--';
+            const endTime = points[points.length-1].created_at ? new Date(points[points.length-1].created_at).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}) : '--:--';
+
+            document.getElementById("histTotalKm").innerText = `${totalKm.toFixed(1)} กม.`;
+            document.getElementById("histMaxSpeed").innerText = `${maxSpd} km/h`;
+            document.getElementById("histPointCount").innerText = `${points.length} จุด`;
+            document.getElementById("histTimeRange").innerText = `${startTime} - ${endTime}`;
+
+            slider.max = points.length - 1;
+            slider.value = 0;
+            currentHistoryIndex = 0;
+
+            // Render History Table
+            tableBody.innerHTML = points.slice().reverse().map((p, idx) => {
+                const timeStr = p.created_at ? new Date(p.created_at).toLocaleTimeString('th-TH') : '--:--:--';
+                const isMoving = (p.status || '').includes("MOVING") || (p.speed_kmh || 0) > 3;
+                const statusBadge = isMoving ? `<span class="text-emerald-400 font-semibold">MOVING</span>` : `<span class="text-amber-400 font-semibold">IDLE</span>`;
+                const pName = placeNameCache[`${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}`] || `${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`;
+
+                return `
+                    <tr class="hover:bg-slate-800/60 cursor-pointer" onclick="jumpToPlaybackPoint(${points.length - 1 - idx})">
+                        <td class="p-1.5 font-mono text-sky-400">${timeStr}</td>
+                        <td class="p-1.5 truncate max-w-[150px]">${pName}</td>
+                        <td class="p-1.5 font-bold ${p.speed_kmh > 3 ? 'text-amber-400' : 'text-slate-400'}">${p.speed_kmh || 0} km/h</td>
+                        <td class="p-1.5">${statusBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Draw Route Polyline on Leaflet Map
+            if (mainPolyline) map.removeLayer(mainPolyline);
+            const latLngs = points.map(p => [p.latitude, p.longitude]);
+            mainPolyline = L.polyline(latLngs, { color: '#38BDF8', weight: 4, opacity: 0.8 }).addTo(map);
+
+            if (latLngs.length > 0) {
+                map.fitBounds(mainPolyline.getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: [40, 200] });
+            }
+
+            updatePlaybackFrame(0);
+        }
+
+        function updatePlaybackFrame(index) {
+            if (!currentHistoryPoints || currentHistoryPoints.length === 0) return;
+            currentHistoryIndex = Math.max(0, Math.min(index, currentHistoryPoints.length - 1));
+
+            const point = currentHistoryPoints[currentHistoryIndex];
+            document.getElementById("playbackSlider").value = currentHistoryIndex;
+            document.getElementById("playbackCurrentTime").innerText = point.created_at ? new Date(point.created_at).toLocaleTimeString('th-TH') : '--:--:--';
+
+            const place = placeNameCache[`${point.latitude.toFixed(3)},${point.longitude.toFixed(3)}`] || `${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}`;
+            document.getElementById("playbackLocationText").innerHTML = `<span class="text-slate-200">${place}</span> <span class="text-amber-400 font-bold ml-1">(${point.speed_kmh || 0} km/h)</span>`;
+
+            // Move animated playback marker on map
+            if (playbackMarker) {
+                playbackMarker.setLatLng([point.latitude, point.longitude]);
+            } else {
+                const icon = L.divIcon({
+                    html: `<div class="w-8 h-8 rounded-full bg-rose-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-lg animate-bounce"><i class="fa-solid fa-car"></i></div>`,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+                playbackMarker = L.marker([point.latitude, point.longitude], { icon }).addTo(map);
+            }
+        }
+
+        function onPlaybackSliderChange(val) {
+            updatePlaybackFrame(parseInt(val));
+        }
+
+        function jumpToPlaybackPoint(idx) {
+            updatePlaybackFrame(idx);
+        }
+
+        function togglePlayback() {
+            if (isPlaybackPlaying) {
+                pausePlayback();
+            } else {
+                startPlayback();
+            }
+        }
+
+        function startPlayback() {
+            if (!currentHistoryPoints || currentHistoryPoints.length === 0) return;
+            isPlaybackPlaying = true;
+            document.getElementById("playIcon").className = "fa-solid fa-pause";
+            document.getElementById("playText").innerText = "หยุดพัก";
+
+            if (playbackInterval) clearInterval(playbackInterval);
+            const intervalTime = Math.max(100, Math.round(800 / playbackSpeed));
+
+            playbackInterval = setInterval(() => {
+                if (currentHistoryIndex < currentHistoryPoints.length - 1) {
+                    updatePlaybackFrame(currentHistoryIndex + 1);
+                } else {
+                    pausePlayback();
+                }
+            }, intervalTime);
+        }
+
+        function pausePlayback() {
+            isPlaybackPlaying = false;
+            if (playbackInterval) clearInterval(playbackInterval);
+            document.getElementById("playIcon").className = "fa-solid fa-play";
+            document.getElementById("playText").innerText = "เล่น";
+        }
+
+        function resetPlayback() {
+            pausePlayback();
+            updatePlaybackFrame(0);
+        }
+
+        function toggleHistoryModal(show) {
+            const modal = document.getElementById("historyModal");
+            if (!modal) return;
+            if (show === undefined) {
+                modal.classList.toggle("hidden");
+            } else if (show) {
+                modal.classList.remove("hidden");
+            } else {
+                modal.classList.add("hidden");
+                pausePlayback();
+            }
+        }
+
+        // --- Daily & Monthly Fleet Usage Search & Reporting Logic ---
+        let dailyReportRawData = [];
+
+        function onSearchTypeChange() {
+            const type = document.getElementById("reportSearchType") ? document.getElementById("reportSearchType").value : "daily";
+            const dailyContainer = document.getElementById("dailyDateContainer");
+            const monthlyContainer = document.getElementById("monthlyDateContainer");
+
+            if (type === "monthly") {
+                if (dailyContainer) dailyContainer.classList.add("hidden");
+                if (monthlyContainer) monthlyContainer.classList.remove("hidden");
+                const monthInput = document.getElementById("reportMonthInput");
+                if (monthInput && !monthInput.value) {
+                    const now = new Date();
+                    const yyyy = now.getFullYear();
+                    const mm = String(now.getMonth() + 1).padStart(2, '0');
+                    monthInput.value = `${yyyy}-${mm}`;
+                }
+            } else {
+                if (monthlyContainer) monthlyContainer.classList.add("hidden");
+                if (dailyContainer) dailyContainer.classList.remove("hidden");
+                const dateInput = document.getElementById("reportDateInput");
+                if (dateInput && !dateInput.value) {
+                    dateInput.value = new Date().toISOString().split('T')[0];
+                }
+            }
+            fetchDailyReportData();
+        }
+
+        function openDailyReportModal() {
+            const dateInput = document.getElementById("reportDateInput");
+            const monthInput = document.getElementById("reportMonthInput");
+            const now = new Date();
+            if (dateInput && !dateInput.value) {
+                dateInput.value = now.toISOString().split('T')[0];
+            }
+            if (monthInput && !monthInput.value) {
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                monthInput.value = `${yyyy}-${mm}`;
+            }
+            toggleDailyReportModal(true);
+            fetchDailyReportData();
+        }
+
+        function toggleDailyReportModal(show) {
+            const modal = document.getElementById("dailyReportModal");
+            if (show === undefined) {
+                modal.classList.toggle("hidden");
+            } else if (show) {
+                modal.classList.remove("hidden");
+            } else {
+                modal.classList.add("hidden");
+            }
+        }
+
+        async function fetchDailyReportData() {
+            const searchType = document.getElementById("reportSearchType") ? document.getElementById("reportSearchType").value : "daily";
+            const tableBody = document.getElementById("dailyReportTableBody");
+            
+            let startIso = "";
+            let endIso = "";
+            let displayLabel = "";
+
+            if (searchType === "monthly") {
+                const monthVal = document.getElementById("reportMonthInput").value;
+                if (!monthVal) return;
+                const [yearStr, monthStr] = monthVal.split('-');
+                const year = parseInt(yearStr);
+                const month = parseInt(monthStr);
+                const lastDay = new Date(year, month, 0).getDate();
+                const monthPadded = String(month).padStart(2, '0');
+                startIso = `${yearStr}-${monthPadded}-01T00:00:00.000Z`;
+                endIso = `${yearStr}-${monthPadded}-${String(lastDay).padStart(2, '0')}T23:59:59.999Z`;
+
+                const monthNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+                displayLabel = `เดือน${monthNames[month - 1]} ${year + 543} (${monthVal})`;
+            } else {
+                const selectedDate = document.getElementById("reportDateInput").value;
+                if (!selectedDate) return;
+                startIso = `${selectedDate}T00:00:00.000Z`;
+                endIso = `${selectedDate}T23:59:59.999Z`;
+                displayLabel = `วันที่ ${selectedDate}`;
+            }
+
+            tableBody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-400 mb-2"></i><p>กำลังค้นหาข้อมูลประวัติเส้นทางสำหรับ ${displayLabel}...</p></td></tr>`;
+            document.getElementById("reportDateBadge").innerText = displayLabel;
+
+            try {
+                const cleanedUrl = supabaseUrl.trim().replace(/\/$/, "");
+
+                // Query telemetry history for selected date/month
+                const res = await fetch(`${cleanedUrl}/rest/v1/telemetry_history?created_at=gte.${startIso}&created_at=lte.${endIso}&order=created_at.asc&limit=10000`, {
+                    headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+                });
+
+                if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+
+                const historyRecords = await res.json();
+
+                // Group points by vehicle_id
+                const grouped = {};
+                historyRecords.forEach(rec => {
+                    const vid = rec.vehicle_id;
+                    if (!grouped[vid]) grouped[vid] = [];
+                    grouped[vid].push(rec);
+                });
+
+                // Match with vehiclesData metadata
+                dailyReportRawData = vehiclesData.map(v => {
+                    const points = grouped[v.vehicle_id] || [];
+                    const distanceKm = calculateTodayDistanceKm(points);
+                    const maxSpeed = points.length > 0 ? Math.max(...points.map(p => p.speed_kmh || 0)) : 0;
+                    return {
+                        vehicle_id: v.vehicle_id,
+                        vehicle_name: v.vehicle_name || v.vehicle_id,
+                        license_plate: v.license_plate || '-',
+                        driver_name: v.driver_name || '-',
+                        office_name: v.office_name || '-',
+                        province_group: v.province_group || '-',
+                        points_count: points.length,
+                        distance_km: distanceKm,
+                        max_speed: maxSpeed,
+                        points: points,
+                        is_active: points.length > 0 && distanceKm > 0.01
+                    };
+                });
+
+                renderDailyReportUI();
+            } catch (err) {
+                console.error("Fetch daily report error:", err);
+                tableBody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-rose-400 bg-rose-950/40">เกิดข้อผิดพลาดในการโหลดรายงาน: ${err.message}</td></tr>`;
+            }
+        }
+
+        function renderDailyReportUI() {
+            const filterProv = document.getElementById("reportProvinceFilter").value;
+            const hideInactive = document.getElementById("onlyActiveVehiclesToggle") ? document.getElementById("onlyActiveVehiclesToggle").checked : true;
+            const tableBody = document.getElementById("dailyReportTableBody");
+
+            let items = dailyReportRawData;
+            if (filterProv !== "ALL") {
+                items = items.filter(i => (i.province_group || '').trim() === filterProv.trim());
+            }
+
+            if (hideInactive) {
+                items = items.filter(i => i.is_active && i.distance_km > 0);
+            }
+
+            const activeVehicles = items.filter(i => i.is_active);
+            const totalFleetKm = items.reduce((sum, i) => sum + i.distance_km, 0);
+            const totalGpsPoints = items.reduce((sum, i) => sum + i.points_count, 0);
+            const uniqueOffices = new Set(items.filter(i => i.office_name && i.office_name !== '-').map(i => i.office_name)).size;
+
+            document.getElementById("reportActiveCount").innerText = `${activeVehicles.length} คัน`;
+            document.getElementById("reportTotalFleetKm").innerText = `${totalFleetKm.toFixed(1)} กม.`;
+            document.getElementById("reportOfficeCount").innerText = `${uniqueOffices} แห่ง`;
+            document.getElementById("reportTotalGpsPoints").innerText = `${totalGpsPoints} จุด`;
+
+            renderRechartsDistanceChart(items);
+
+            if (items.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="p-8 text-center text-slate-400 bg-slate-900/50">
+                            <i class="fa-solid fa-circle-exclamation text-amber-400 text-2xl mb-2"></i>
+                            <p class="font-medium text-slate-200">ไม่พบข้อมูลรถที่ออกวิ่งตามเงื่อนไขที่เลือก</p>
+                            <p class="text-xs text-slate-400 mt-1">${hideInactive ? '(ขณะนี้เปิดโหมดซ่อนรถที่ไม่วิ่ง 0 กม.)' : ''}</p>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = items.map(item => `
+                <tr class="hover:bg-slate-800/60 transition">
+                    <td class="p-3">
+                        <div class="font-bold text-slate-100 text-sm">${item.vehicle_name}</div>
+                        <div class="text-[11px] text-slate-400 font-mono">ทะเบียน: ${item.license_plate}</div>
+                    </td>
+                    <td class="p-3 text-slate-200">${item.driver_name}</td>
+                    <td class="p-3 text-slate-300">🏢 ${item.office_name}</td>
+                    <td class="p-3 text-sky-400 font-medium">📍 ${item.province_group}</td>
+                    <td class="p-3 font-bold text-emerald-400 text-sm">
+                        ${item.distance_km.toFixed(1)} กม.
+                        <div class="text-[10px] text-slate-500 font-normal">(${item.points_count} จุด GPS)</div>
+                    </td>
+                    <td class="p-3 text-amber-400 font-semibold">${item.max_speed} km/h</td>
+                    <td class="p-3 text-center">
+                        <button onclick="toggleDailyReportModal(false); openVehicleHistoryModal('${item.vehicle_id}')" 
+                                class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 px-3 py-1 rounded-lg text-xs font-medium transition inline-flex items-center space-x-1">
+                            <i class="fa-solid fa-map"></i>
+                            <span>เปิดแผนที่</span>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderRechartsDistanceChart(items) {
+            const chartContainer = document.getElementById("rechartsChartRoot");
+            if (!chartContainer) return;
+
+            if (!items || items.length === 0) {
+                chartContainer.innerHTML = '<div class="p-6 text-center text-slate-500 text-xs"><i class="fa-solid fa-circle-info text-amber-400 mb-1 block text-lg"></i>ไม่มีข้อมูลระยะทางสำหรับช่วงเวลาที่เลือก</div>';
+                return;
+            }
+
+            // Group distance_km by office_name or province_group
+            const grouped = {};
+            items.forEach(item => {
+                let key = item.office_name;
+                if (!key || key === '-') {
+                    key = item.province_group && item.province_group !== '-' ? `กลุ่ม ปจ.${item.province_group}` : 'ไม่ระบุสำนักงาน';
+                }
+                const dist = parseFloat(item.distance_km) || 0;
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        office: key,
+                        province: item.province_group || '',
+                        totalKm: 0,
+                        vehicleCount: 0
+                    };
+                }
+                grouped[key].totalKm += dist;
+                grouped[key].vehicleCount += 1;
+            });
+
+            // Convert to sorted array
+            const chartData = Object.values(grouped)
+                .map(g => ({
+                    office: g.office,
+                    province: g.province,
+                    distance: parseFloat(g.totalKm.toFixed(2)),
+                    vehicles: g.vehicleCount
+                }))
+                .sort((a, b) => b.distance - a.distance);
+
+            if (chartData.length === 0 || chartData.every(d => d.distance === 0)) {
+                chartContainer.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs"><i class="fa-solid fa-ban text-slate-500 text-lg mb-1 block"></i>ไม่พบระยะทางวิ่งในสำนักงานที่เลือก (ระยะทาง 0 กม.)</div>';
+                return;
+            }
+
+            // Check if Recharts and React are loaded
+            const RechartsLib = window.Recharts || window.recharts;
+            const ReactLib = window.React;
+            const ReactDOMLib = window.ReactDOM;
+
+            if (RechartsLib && ReactLib && ReactDOMLib) {
+                try {
+                    const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } = RechartsLib;
+                    const e = ReactLib.createElement;
+
+                    // Custom Tooltip component
+                    const CustomTooltip = ({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return e('div', { className: 'bg-slate-800 border border-slate-600 p-2.5 rounded-lg shadow-xl text-xs text-slate-100' },
+                                e('p', { className: 'font-bold text-sky-400 mb-1' }, data.office),
+                                e('p', { className: 'text-slate-300' }, 'ระยะทางวิ่งรวม: ', e('span', { className: 'font-bold text-emerald-400' }, `${data.distance.toLocaleString()} กม.`)),
+                                e('p', { className: 'text-slate-400 text-[11px] mt-0.5' }, `จำนวนรถ: ${data.vehicles} คัน`)
+                            );
+                        }
+                        return null;
+                    };
+
+                    const barColors = ['#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#06B6D4', '#14B8A6'];
+
+                    const chartElement = e(ResponsiveContainer, { width: '100%', height: 230 },
+                        e(BarChart, { data: chartData, margin: { top: 10, right: 15, left: -10, bottom: 20 } },
+                            e(CartesianGrid, { strokeDasharray: '3 3', stroke: '#334155', vertical: false }),
+                            e(XAxis, { 
+                                dataKey: 'office', 
+                                stroke: '#94A3B8', 
+                                fontSize: 11, 
+                                tickLine: false,
+                                angle: chartData.length > 5 ? -15 : 0,
+                                textAnchor: chartData.length > 5 ? 'end' : 'middle',
+                                interval: 0
+                            }),
+                            e(YAxis, { 
+                                stroke: '#94A3B8', 
+                                fontSize: 11, 
+                                tickLine: false,
+                                unit: ' กม.'
+                            }),
+                            e(Tooltip, { content: e(CustomTooltip) }),
+                            e(Bar, { dataKey: 'distance', name: 'ระยะทางวิ่ง (กม.)', radius: [6, 6, 0, 0], barSize: 32 },
+                                chartData.map((entry, index) => e(Cell, { key: `cell-${index}`, fill: barColors[index % barColors.length] }))
+                            )
+                        )
+                    );
+
+                    chartContainer.innerHTML = '';
+                    const rootContainer = document.createElement('div');
+                    rootContainer.className = 'w-full h-full';
+                    chartContainer.appendChild(rootContainer);
+
+                    if (ReactDOMLib.createRoot) {
+                        const root = ReactDOMLib.createRoot(rootContainer);
+                        root.render(chartElement);
+                    } else {
+                        ReactDOMLib.render(chartElement, rootContainer);
+                    }
+                    return;
+                } catch (err) {
+                    console.error("Recharts render error:", err);
+                }
+            }
+
+            // Fallback HTML Bar Chart if CDN isn't loaded
+            const maxDist = Math.max(...chartData.map(d => d.distance)) || 1;
+            let html = '<div class="space-y-2 p-2 w-full max-h-56 overflow-y-auto">';
+            chartData.forEach((item) => {
+                const pct = Math.min(100, Math.round((item.distance / maxDist) * 100));
+                html += `
+                    <div class="text-xs">
+                        <div class="flex justify-between text-slate-300 mb-0.5">
+                            <span class="font-medium text-slate-200">${item.office} (${item.vehicles} คัน)</span>
+                            <span class="text-emerald-400 font-bold">${item.distance.toLocaleString()} กม.</span>
+                        </div>
+                        <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
+                            <div class="bg-gradient-to-r from-emerald-500 to-sky-500 h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            chartContainer.innerHTML = html;
+        }
+
+        function exportDailyReportCSV() {
+            const searchType = document.getElementById("reportSearchType") ? document.getElementById("reportSearchType").value : "daily";
+            let dateLabel = "";
+            if (searchType === "monthly") {
+                dateLabel = document.getElementById("reportMonthInput").value || "Monthly";
+            } else {
+                dateLabel = document.getElementById("reportDateInput").value || new Date().toISOString().split('T')[0];
+            }
+
+            const filterProv = document.getElementById("reportProvinceFilter").value;
+            const hideInactive = document.getElementById("onlyActiveVehiclesToggle") ? document.getElementById("onlyActiveVehiclesToggle").checked : true;
+
+            let items = dailyReportRawData;
+            if (filterProv !== "ALL") {
+                items = items.filter(i => (i.province_group || '').trim() === filterProv.trim());
+            }
+
+            if (hideInactive) {
+                items = items.filter(i => i.is_active && i.distance_km > 0);
+            }
+
+            if (!items || items.length === 0) {
+                alert("ไม่มีข้อมูลรายงานสำหรับส่งออกในขณะนี้ (ไม่มีรถที่ออกวิ่งตามเงื่อนไขที่เลือก)");
+                return;
+            }
+
+            // UTF-8 BOM for Thai language compatibility in Microsoft Excel
+            let csvContent = "\uFEFF";
+            csvContent += "ช่วงเวลา,ทะเบียนรถ,ชื่อรถ,คนขับ,ที่ทำการ (ปจ./ปณ.),กลุ่มจังหวัด,ระยะทางวิ่ง (กม.),ความเร็วสูงสุด (km/h),จำนวนจุด GPS\n";
+
+            items.forEach(item => {
+                const row = [
+                    `"${dateLabel}"`,
+                    `"${(item.license_plate || '').replace(/"/g, '""')}"`,
+                    `"${(item.vehicle_name || '').replace(/"/g, '""')}"`,
+                    `"${(item.driver_name || '').replace(/"/g, '""')}"`,
+                    `"${(item.office_name || '').replace(/"/g, '""')}"`,
+                    `"${(item.province_group || '').replace(/"/g, '""')}"`,
+                    `"${item.distance_km.toFixed(2)}"`,
+                    `"${item.max_speed}"`,
+                    `"${item.points_count}"`
+                ];
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Fleet_Report_${searchType}_${dateLabel}_${filterProv !== 'ALL' ? filterProv : 'ALL'}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         }
 
         function filterVehicles() {
             updateUI(vehiclesData);
         }
 
-        function toggleSettingsModal() {
-            document.getElementById("settingsModal").classList.toggle("hidden");
+        function clearSearch() {
+            const input = document.getElementById("searchInput");
+            if (input) {
+                input.value = "";
+            }
+            filterVehicles();
         }
 
-        function saveSettings() {
-            supabaseUrl = document.getElementById("supabaseUrlInput").value;
-            supabaseKey = document.getElementById("supabaseKeyInput").value;
-            localStorage.setItem("sp_url", supabaseUrl);
-            localStorage.setItem("sp_key", supabaseKey);
-            toggleSettingsModal();
-            fetchVehiclesData();
+        // Authentication & Role Management State
+        let currentUser = null;
+
+        function loadStoredUser() {
+            try {
+                const stored = localStorage.getItem("cartrack_auth_user");
+                if (stored) {
+                    currentUser = JSON.parse(stored);
+                } else {
+                    currentUser = {
+                        id: "guest",
+                        name: "ผู้ใช้งานทั่วไป",
+                        role: "guest",
+                        province_group: "GUEST"
+                    };
+                }
+            } catch (e) {
+                currentUser = { id: "guest", name: "ผู้ใช้งานทั่วไป", role: "guest", province_group: "GUEST" };
+            }
+            updateAuthUI();
         }
 
-        // Initial Load & Auto Poll every 3 seconds
+        function saveUserSession(user) {
+            currentUser = user || { id: "guest", name: "ผู้ใช้งานทั่วไป", role: "guest", province_group: "GUEST" };
+            localStorage.setItem("cartrack_auth_user", JSON.stringify(currentUser));
+            updateAuthUI();
+            if (document.getElementById("adminModal") && !document.getElementById("adminModal").classList.contains("hidden")) {
+                renderAdminVehicleList();
+            }
+        }
+
+        function updateAuthUI() {
+            const container = document.getElementById("userHeaderProfile");
+            if (!container) return;
+
+            const adminUserMgmtBtn = document.getElementById("adminUserMgmtBtn");
+
+            if (!currentUser || currentUser.role === 'guest') {
+                container.innerHTML = `
+                    <button onclick="openLoginModal()" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition shadow-lg shadow-sky-600/20">
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                        <span>เข้าสู่ระบบ</span>
+                    </button>
+                `;
+                if (adminUserMgmtBtn) adminUserMgmtBtn.classList.add("hidden");
+                const manageBtnText = document.getElementById("manageBtnText");
+                if (manageBtnText) manageBtnText.innerText = "จัดการข้อมูลรถ";
+                return;
+            }
+
+            let badgeHtml = '';
+            if (currentUser.role === 'admin') {
+                badgeHtml = `<span class="bg-purple-950 text-purple-300 border border-purple-700 px-2 py-0.5 rounded text-[11px] font-bold flex items-center space-x-1">
+                    <span>👑 Super Admin</span>
+                </span>
+                <button onclick="openUserMgmtModal()" class="bg-purple-900/90 hover:bg-purple-800 text-purple-200 border border-purple-500/50 px-2 py-0.5 rounded text-[11px] font-bold flex items-center space-x-1 transition ml-1" title="จัดการบัญชีผู้จัดการและรหัสผ่าน">
+                    <i class="fa-solid fa-users-gear"></i>
+                    <span>จัดการ User/Pass</span>
+                </button>`;
+                if (adminUserMgmtBtn) adminUserMgmtBtn.classList.remove("hidden");
+            } else if (currentUser.role === 'manager') {
+                badgeHtml = `<span class="bg-emerald-950 text-emerald-300 border border-emerald-700 px-2 py-0.5 rounded text-[11px] font-bold flex items-center space-x-1">
+                    <span>🏢 Manager (${currentUser.province_group || 'กลุ่มจังหวัด'})</span>
+                </span>`;
+                if (adminUserMgmtBtn) adminUserMgmtBtn.classList.add("hidden");
+            }
+
+            container.innerHTML = `
+                <div class="flex items-center space-x-1.5 bg-slate-900/90 border border-slate-700 rounded-lg px-2 py-1">
+                    ${badgeHtml}
+                    <button onclick="logoutUser()" title="ออกจากระบบ" class="text-slate-400 hover:text-rose-400 text-xs px-1">
+                        <i class="fa-solid fa-power-off"></i>
+                    </button>
+                </div>
+            `;
+
+            const manageBtnText = document.getElementById("manageBtnText");
+            if (manageBtnText) {
+                if (currentUser.role === 'admin') {
+                    manageBtnText.innerText = "จัดการข้อมูล (Super Admin)";
+                } else if (currentUser.role === 'manager') {
+                    manageBtnText.innerText = `จัดการกลุ่ม (${currentUser.province_group})`;
+                } else {
+                    manageBtnText.innerText = "จัดการข้อมูล";
+                }
+            }
+        }
+
+        function openLoginModal() {
+            const errBox = document.getElementById("loginErrorMsg");
+            if (errBox) errBox.classList.add("hidden");
+            const modal = document.getElementById("loginModal");
+            if (modal) modal.classList.remove("hidden");
+        }
+
+        function closeLoginModal() {
+            const modal = document.getElementById("loginModal");
+            if (modal) modal.classList.add("hidden");
+        }
+
+        function fillLoginForm(u, p) {
+            const uInput = document.getElementById("loginUsernameInput");
+            const pInput = document.getElementById("loginPasswordInput");
+            const errBox = document.getElementById("loginErrorMsg");
+            if (uInput) uInput.value = u;
+            if (pInput) pInput.value = p;
+            if (errBox) errBox.classList.add("hidden");
+        }
+
+        const AUTHORIZED_CREDENTIALS = {
+            "admin": { pass: "admin123", role: "admin", name: "Super Admin", province: "ALL", code: "ALL" },
+            "40000": { pass: "pass40000", role: "manager", name: "User Manager (ขอนแก่น)", province: "ขอนแก่น", code: "40000" },
+            "41000": { pass: "pass41000", role: "manager", name: "User Manager (อุดรธานี)", province: "อุดรธานี", code: "41000" },
+            "43000": { pass: "pass43000", role: "manager", name: "User Manager (หนองคาย)", province: "หนองคาย", code: "43000" },
+            "47000": { pass: "pass47000", role: "manager", name: "User Manager (สกลนคร)", province: "สกลนคร", code: "47000" },
+            "34000": { pass: "pass34000", role: "manager", name: "User Manager (อุบลราชธานี)", province: "อุบลราชธานี", code: "34000" },
+            "30000": { pass: "pass30000", role: "manager", name: "User Manager (นครราชสีมา)", province: "นครราชสีมา", code: "30000" }
+        };
+
+        function getUserCustomAccounts() {
+            try {
+                const stored = localStorage.getItem("fleet_custom_user_accounts");
+                return stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveUserCustomAccounts(accs) {
+            try {
+                localStorage.setItem("fleet_custom_user_accounts", JSON.stringify(accs));
+            } catch (e) {
+                console.error("Failed to save custom user accounts:", e);
+            }
+        }
+
+        function getMergedCredentials() {
+            const customAccs = getUserCustomAccounts();
+            return { ...AUTHORIZED_CREDENTIALS, ...customAccs };
+        }
+
+        function renderLoginAccountsTable() {
+            const tbody = document.getElementById("loginAccountsTbody");
+            if (!tbody) return;
+            const creds = getMergedCredentials();
+            let html = '';
+            
+            Object.keys(creds).forEach(username => {
+                const item = creds[username];
+                const isAdmin = item.role === 'admin';
+                const roleBadgeClass = isAdmin ? 'font-bold text-purple-300' : 'text-emerald-300 font-semibold';
+                const roleIcon = isAdmin ? '👑' : '🏢';
+                const btnBg = isAdmin 
+                    ? 'bg-purple-900/80 hover:bg-purple-800 text-purple-200 border-purple-500/30' 
+                    : 'bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border-emerald-500/30';
+
+                html += `
+                    <tr class="hover:bg-slate-800/40">
+                        <td class="p-1.5 ${roleBadgeClass}">${roleIcon} ${item.name}</td>
+                        <td class="p-1.5 font-mono text-white">${username}</td>
+                        <td class="p-1.5 font-mono text-emerald-400 font-bold">${item.pass}</td>
+                        <td class="p-1.5 text-center">
+                            <button type="button" onclick="fillLoginForm('${username}', '${item.pass}')" class="text-[10px] ${btnBg} px-2 py-0.5 rounded border">ใส่ข้อมูล</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function openUserMgmtModal() {
+            if (!currentUser || currentUser.role !== 'admin') {
+                alert("เฉพาะ Super Admin เท่านั้นที่สามารถจัดการบัญชีผู้ใช้งานได้");
+                return;
+            }
+            resetMgmtForm();
+            renderUserMgmtTable();
+            const modal = document.getElementById("userMgmtModal");
+            if (modal) modal.classList.remove("hidden");
+        }
+
+        function closeUserMgmtModal() {
+            const modal = document.getElementById("userMgmtModal");
+            if (modal) modal.classList.add("hidden");
+        }
+
+        function resetMgmtForm() {
+            const uInput = document.getElementById("mgmtUsername");
+            const pInput = document.getElementById("mgmtPassword");
+            const nInput = document.getElementById("mgmtName");
+            const provInput = document.getElementById("mgmtProvince");
+            const title = document.getElementById("userFormTitle");
+
+            if (uInput) { uInput.value = ""; uInput.readOnly = false; }
+            if (pInput) pInput.value = "";
+            if (nInput) nInput.value = "";
+            if (provInput) provInput.value = "";
+            if (title) title.innerText = "เพิ่ม / แก้ไข บัญชีผู้ใช้งาน Manager";
+        }
+
+        function saveUserAccountForm(e) {
+            if (e) e.preventDefault();
+            const uInput = document.getElementById("mgmtUsername");
+            const pInput = document.getElementById("mgmtPassword");
+            const nInput = document.getElementById("mgmtName");
+            const provInput = document.getElementById("mgmtProvince");
+
+            if (!uInput || !pInput || !nInput || !provInput) return;
+
+            const username = uInput.value.trim().toLowerCase();
+            const password = pInput.value.trim();
+            const name = nInput.value.trim();
+            const province = provInput.value.trim();
+
+            if (!username || !password || !name || !province) {
+                alert("กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง");
+                return;
+            }
+
+            const customAccs = getUserCustomAccounts();
+            
+            customAccs[username] = {
+                pass: password,
+                role: (username === 'admin') ? 'admin' : 'manager',
+                name: name,
+                province: province,
+                code: username
+            };
+
+            saveUserCustomAccounts(customAccs);
+            alert(`✅ บันทึกบัญชีผู้ใช้ [${username}] (รหัสผ่าน: ${password}) เรียบร้อยแล้ว!`);
+            resetMgmtForm();
+            renderUserMgmtTable();
+            renderLoginAccountsTable();
+        }
+
+        function editUserAccountInForm(username) {
+            const creds = getMergedCredentials();
+            const item = creds[username];
+            if (!item) return;
+
+            const uInput = document.getElementById("mgmtUsername");
+            const pInput = document.getElementById("mgmtPassword");
+            const nInput = document.getElementById("mgmtName");
+            const provInput = document.getElementById("mgmtProvince");
+            const title = document.getElementById("userFormTitle");
+
+            if (uInput) { uInput.value = username; uInput.readOnly = true; }
+            if (pInput) pInput.value = item.pass;
+            if (nInput) nInput.value = item.name;
+            if (provInput) provInput.value = item.province || item.code;
+            if (title) title.innerText = `แก้ไขบัญชีผู้ใช้: ${username}`;
+        }
+
+        function quickEditUserPassword(username) {
+            const creds = getMergedCredentials();
+            const item = creds[username];
+            if (!item) return;
+
+            const newPass = prompt(`กรอกรหัสผ่านใหม่สำหรับผู้ใช้ [${username} - ${item.name}]:`, item.pass);
+            if (!newPass || !newPass.trim()) return;
+
+            const customAccs = getUserCustomAccounts();
+            customAccs[username] = {
+                ...item,
+                pass: newPass.trim()
+            };
+
+            saveUserCustomAccounts(customAccs);
+            alert(`✅ เปลี่ยนรหัสผ่านสำหรับ [${username}] เป็น "${newPass.trim()}" เรียบร้อยแล้ว`);
+            renderUserMgmtTable();
+            renderLoginAccountsTable();
+        }
+
+        function deleteUserAccount(username) {
+            if (username === 'admin') {
+                alert("ไม่สามารถลบบัญชี Super Admin ได้");
+                return;
+            }
+
+            if (!confirm(`คุณต้องการลบบัญชีผู้ใช้งาน [${username}] หรือไม่?`)) return;
+
+            const customAccs = getUserCustomAccounts();
+            delete customAccs[username];
+            saveUserCustomAccounts(customAccs);
+            alert(`🗑️ ลบบัญชีผู้ใช้งาน [${username}] เรียบร้อยแล้ว`);
+            renderUserMgmtTable();
+            renderLoginAccountsTable();
+        }
+
+        function renderUserMgmtTable() {
+            const tbody = document.getElementById("userMgmtTbody");
+            if (!tbody) return;
+
+            const creds = getMergedCredentials();
+            let html = '';
+
+            Object.keys(creds).forEach(username => {
+                const item = creds[username];
+                const isBuiltinAdmin = username === 'admin';
+                const isCustom = !!getUserCustomAccounts()[username];
+
+                html += `
+                    <tr class="hover:bg-slate-800/60 transition">
+                        <td class="p-2.5 font-mono text-white font-bold">${username}</td>
+                        <td class="p-2.5">
+                            <span class="${isBuiltinAdmin ? 'text-purple-300 font-bold' : 'text-slate-200'}">${item.name}</span>
+                            ${isCustom ? '<span class="ml-1 text-[9px] bg-sky-900/80 text-sky-300 px-1.5 py-0.2 rounded border border-sky-500/30">Custom</span>' : ''}
+                        </td>
+                        <td class="p-2.5 text-slate-300">${item.province || '-'}</td>
+                        <td class="p-2.5 font-mono text-emerald-400 font-bold">${item.pass}</td>
+                        <td class="p-2.5 text-center">
+                            <div class="flex items-center justify-center space-x-1">
+                                <button type="button" onclick="editUserAccountInForm('${username}')" title="แก้ไขข้อมูล" class="bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 px-2 py-1 rounded text-[11px] border border-indigo-500/30 transition">
+                                    <i class="fa-solid fa-pen-to-square"></i> แก้ไข
+                                </button>
+                                <button type="button" onclick="quickEditUserPassword('${username}')" title="เปลี่ยนรหัสผ่าน" class="bg-amber-900/80 hover:bg-amber-800 text-amber-200 px-2 py-1 rounded text-[11px] border border-amber-500/30 transition">
+                                    <i class="fa-solid fa-key"></i> เปลี่ยนรหัส
+                                </button>
+                                ${!isBuiltinAdmin ? `
+                                    <button type="button" onclick="deleteUserAccount('${username}')" title="ลบบัญชี" class="bg-rose-900/80 hover:bg-rose-800 text-rose-200 px-2 py-1 rounded text-[11px] border border-rose-500/30 transition">
+                                        <i class="fa-solid fa-trash"></i> ลบ
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function handleFormLogin(e) {
+            if (e) e.preventDefault();
+            const errBox = document.getElementById("loginErrorMsg");
+            const errTxt = document.getElementById("loginErrorText");
+            if (errBox) errBox.classList.add("hidden");
+
+            const uInput = document.getElementById("loginUsernameInput");
+            const pInput = document.getElementById("loginPasswordInput");
+            if (!uInput || !pInput) return;
+
+            const username = uInput.value.trim().toLowerCase();
+            const password = pInput.value.trim();
+
+            if (!username || !password) {
+                if (errBox && errTxt) {
+                    errTxt.innerText = "กรุณากรอกทั้ง ชื่อผู้ใช้ และ รหัสผ่าน";
+                    errBox.classList.remove("hidden");
+                }
+                return;
+            }
+
+            // Check if credential exists in merged list
+            const creds = getMergedCredentials();
+            const cred = creds[username];
+
+            if (cred) {
+                if (password !== cred.pass) {
+                    if (errBox && errTxt) {
+                        errTxt.innerText = `รหัสผ่านสำหรับ ${username} ไม่ถูกต้อง! กรุณาตรวจสอบรหัสผ่านอีกครั้ง`;
+                        errBox.classList.remove("hidden");
+                    }
+                    return;
+                }
+
+                // Password verified successfully!
+                saveUserSession({
+                    id: "u-" + username,
+                    name: cred.name,
+                    role: cred.role,
+                    province_group: cred.province,
+                    postal_code: cred.code
+                });
+
+                alert(`✅ เข้าสู่ระบบสำเร็จ! สวัสดี ${cred.name}`);
+                closeLoginModal();
+                return;
+            }
+
+            // Fallback for custom province username with pass verification
+            let provinceName = "";
+            let postalCode = username;
+
+            if (username.startsWith('40') || username.includes('ขอนแก่น')) {
+                provinceName = "ขอนแก่น"; postalCode = "40000";
+            } else if (username.startsWith('41') || username.includes('อุดร')) {
+                provinceName = "อุดรธานี"; postalCode = "41000";
+            } else if (username.startsWith('43') || username.includes('หนองคาย')) {
+                provinceName = "หนองคาย"; postalCode = "43000";
+            } else if (username.startsWith('47') || username.includes('สกลนคร')) {
+                provinceName = "สกลนคร"; postalCode = "47000";
+            } else if (username.startsWith('34') || username.includes('อุบล')) {
+                provinceName = "อุบลราชธานี"; postalCode = "34000";
+            } else if (username.startsWith('30') || username.includes('นครราชสีมา')) {
+                provinceName = "นครราชสีมา"; postalCode = "30000";
+            } else {
+                provinceName = username;
+            }
+
+            const expectedPass = "pass" + postalCode;
+            if (password !== expectedPass && password !== postalCode && password !== "1234") {
+                if (errBox && errTxt) {
+                    errTxt.innerText = `รหัสผ่านไม่ถูกต้อง! รหัสผ่านสำหรับผู้จัดการกลุ่ม ${provinceName} คือ pass${postalCode}`;
+                    errBox.classList.remove("hidden");
+                }
+                return;
+            }
+
+            saveUserSession({
+                id: "u-mgr-" + username,
+                name: `User Manager (${provinceName})`,
+                role: "manager",
+                province_group: provinceName,
+                postal_code: postalCode
+            });
+
+            alert(`✅ เข้าสู่ระบบสำเร็จ! ท่านเข้าใช้งานในฐานะ User Manager (${provinceName})`);
+            closeLoginModal();
+        }
+
+        function loginAsCustomManager() {
+            const sel = document.getElementById("customProvinceSelect");
+            const province = sel ? sel.value : "ขอนแก่น";
+            saveUserSession({
+                id: "u-mgr-" + Date.now(),
+                name: `User Manager กลุ่ม${province}`,
+                role: "manager",
+                province_group: province,
+                postal_code: province
+            });
+            alert(`เข้าสู่ระบบในฐานะ User Manager กลุ่มจังหวัด: ${province} เรียบร้อยแล้ว`);
+            closeLoginModal();
+        }
+
+        function logoutUser() {
+            if (confirm("ต้องการออกจากระบบเพื่อสลับเป็นผู้ใช้งานทั่วไป (Guest) ใช่หรือไม่?")) {
+                saveUserSession({ id: "guest", name: "ผู้ใช้งานทั่วไป", role: "guest", province_group: "GUEST" });
+                alert("👋 ออกจากระบบเรียบร้อย สลับเป็นสิทธิ์ผู้ใช้งานทั่วไป (View-only)");
+            }
+        }
+
+        function canUserEditVehicle(v) {
+            if (!currentUser) return false;
+            if (currentUser.role === 'admin') return true;
+            if (currentUser.role === 'manager') {
+                const vPg = (v.province_group || '').trim().toLowerCase();
+                const vOffice = (v.office_name || '').trim().toLowerCase();
+                const uPg = (currentUser.province_group || '').trim().toLowerCase();
+                const uCode = (currentUser.postal_code || '').trim().toLowerCase();
+
+                if (vPg === uPg || (vPg && uPg && (vPg.includes(uPg) || uPg.includes(vPg)))) return true;
+                if (uCode && (vPg.includes(uCode) || vOffice.includes(uCode))) return true;
+
+                if ((uCode === '40000' || uPg === 'ขอนแก่น') && (vPg.includes('ขอนแก่น') || vPg.includes('40000') || vOffice.includes('ขอนแก่น'))) return true;
+                if ((uCode === '41000' || uPg === 'อุดรธานี') && (vPg.includes('อุดร') || vPg.includes('41000') || vOffice.includes('อุดร'))) return true;
+                if ((uCode === '43000' || uPg === 'หนองคาย') && (vPg.includes('หนองคาย') || vPg.includes('43000'))) return true;
+                if ((uCode === '47000' || uPg === 'สกลนคร') && (vPg.includes('สกลนคร') || vPg.includes('47000'))) return true;
+                if ((uCode === '34000' || uPg === 'อุบลราชธานี') && (vPg.includes('อุบล') || vPg.includes('34000'))) return true;
+                if ((uCode === '30000' || uPg === 'นครราชสีมา') && (vPg.includes('นครราชสีมา') || vPg.includes('โคราช') || vPg.includes('30000'))) return true;
+            }
+            return false;
+        }
+
+        // Admin Management Modal Logic
+        let editingVehicleId = null;
+
+        function openAdminModal() {
+            if (!currentUser || currentUser.role === 'guest') {
+                if (confirm("🔒 ต้องเข้าสู่ระบบ (Super Admin หรือ Manager) เพื่อจัดการข้อมูลรถ\nคุณต้องการเข้าสู่ระบบตอนนี้หรือไม่?")) {
+                    openLoginModal();
+                }
+                return;
+            }
+            const modal = document.getElementById("adminModal");
+            if (modal) {
+                modal.classList.remove("hidden");
+                renderAdminVehicleList();
+            }
+        }
+
+        function closeAdminModal() {
+            const modal = document.getElementById("adminModal");
+            if (modal) {
+                modal.classList.add("hidden");
+            }
+        }
+
+        function renderAdminVehicleList() {
+            const tbody = document.getElementById("adminTableBody");
+            if (!tbody) return;
+
+            // Update role badge in header
+            const roleBadge = document.getElementById("adminRoleBadge");
+            const roleDesc = document.getElementById("adminRoleDesc");
+            if (roleBadge && roleDesc) {
+                if (currentUser && currentUser.role === 'admin') {
+                    roleBadge.className = "text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-purple-900/80 text-purple-300 border border-purple-500/50";
+                    roleBadge.innerText = "👑 Super Admin (แก้ไขได้ทุกคัน)";
+                    roleDesc.innerText = "ท่านสามารถแก้ไขข้อมูลทะเบียน ชื่อรถ คนขับ สำนักงาน กลุ่มจังหวัด และสถานะการใช้งานของรถทุกคันได้";
+                } else if (currentUser && currentUser.role === 'manager') {
+                    roleBadge.className = "text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-900/80 text-emerald-300 border border-emerald-500/50";
+                    roleBadge.innerText = `🏢 User Manager (กลุ่ม: ${currentUser.province_group})`;
+                    roleDesc.innerText = `ท่านมีสิทธิ์แก้ไขและจัดการข้อมูลรถในกลุ่มจังหวัด "${currentUser.province_group}" เท่านั้น`;
+                } else {
+                    roleBadge.className = "text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-slate-800 text-slate-400 border border-slate-700";
+                    roleBadge.innerText = "👁️ อ่านอย่างเดียว (Guest)";
+                    roleDesc.innerText = "กรุณาเข้าสู่ระบบเพื่อทำการแก้ไขข้อมูลยานพาหนะ";
+                }
+            }
+
+            const searchVal = document.getElementById("adminSearchInput") ? document.getElementById("adminSearchInput").value.toLowerCase() : "";
+
+            let list = vehiclesData || [];
+            if (searchVal) {
+                list = list.filter(v =>
+                    (v.vehicle_name || '').toLowerCase().includes(searchVal) ||
+                    (v.license_plate || '').toLowerCase().includes(searchVal) ||
+                    (v.driver_name || '').toLowerCase().includes(searchVal) ||
+                    (v.office_name || '').toLowerCase().includes(searchVal) ||
+                    (v.province_group || '').toLowerCase().includes(searchVal)
+                );
+            }
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500">ไม่พบข้อมูลยานพาหนะตามคำค้นหา</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map(v => {
+                const isEditing = editingVehicleId === v.id;
+                const canEdit = canUserEditVehicle(v);
+
+                if (isEditing) {
+                    return `
+                        <tr class="bg-slate-800/90 border-b border-purple-500/50">
+                            <td class="p-2.5">
+                                <input type="text" id="edit_lp_${v.id}" value="${v.license_plate || ''}" class="bg-slate-900 border border-purple-500 rounded px-2 py-1 text-xs text-white w-full">
+                            </td>
+                            <td class="p-2.5">
+                                <input type="text" id="edit_vn_${v.id}" value="${v.vehicle_name || ''}" class="bg-slate-900 border border-purple-500 rounded px-2 py-1 text-xs text-white w-full">
+                            </td>
+                            <td class="p-2.5">
+                                <input type="text" id="edit_dn_${v.id}" value="${v.driver_name || ''}" class="bg-slate-900 border border-purple-500 rounded px-2 py-1 text-xs text-white w-full">
+                            </td>
+                            <td class="p-2.5">
+                                <input type="text" id="edit_on_${v.id}" value="${v.office_name || ''}" class="bg-slate-900 border border-purple-500 rounded px-2 py-1 text-xs text-white w-full">
+                            </td>
+                            <td class="p-2.5">
+                                <input type="text" id="edit_pg_${v.id}" value="${v.province_group || ''}" placeholder="กลุ่มจังหวัด..." class="bg-slate-900 border border-purple-500 rounded px-2 py-1 text-xs text-white w-full">
+                            </td>
+                            <td class="p-2.5 text-center">
+                                <select id="edit_st_${v.id}" class="bg-slate-900 border border-purple-500 rounded px-1.5 py-1 text-xs text-white">
+                                    <option value="true" ${v.is_active ? 'selected' : ''}>ใช้งาน</option>
+                                    <option value="false" ${!v.is_active ? 'selected' : ''}>ปิดใช้งาน</option>
+                                </select>
+                            </td>
+                            <td class="p-2.5 text-center flex items-center justify-center space-x-1.5">
+                                <button onclick="saveAdminVehicle('${v.id}')" title="บันทึก" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-xs font-bold shadow-lg shadow-emerald-600/20"><i class="fa-solid fa-check mr-1"></i>บันทึก</button>
+                                <button onclick="cancelAdminEdit()" title="ยกเลิก" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded text-xs"><i class="fa-solid fa-xmark"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                return `
+                    <tr class="hover:bg-slate-800/50 transition">
+                        <td class="p-3 font-semibold text-sky-400">${v.license_plate || '-'}</td>
+                        <td class="p-3 font-medium text-slate-100">${v.vehicle_name || '-'}</td>
+                        <td class="p-3 text-slate-300">${v.driver_name || '-'}</td>
+                        <td class="p-3 text-slate-300">${v.office_name || '-'}</td>
+                        <td class="p-3 font-semibold text-purple-300 font-mono">${v.province_group || '-'}</td>
+                        <td class="p-3 text-center">
+                            ${v.is_active 
+                                ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-950 text-emerald-400 border border-emerald-800"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse"></span>เปิดใช้งาน</span>'
+                                : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-500 border border-slate-700">ปิดใช้งาน</span>'
+                            }
+                        </td>
+                        <td class="p-3 text-center">
+                            ${canEdit 
+                                ? `<button onclick="startAdminEdit('${v.id}')" class="bg-purple-600/80 hover:bg-purple-500 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center space-x-1 mx-auto shadow-md">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                    <span>แก้ไข</span>
+                                   </button>`
+                                : `<span title="สิทธิ์ไม่ถึง (เฉพาะกลุ่ม ${v.province_group || 'อื่น'})" class="inline-flex items-center text-[10px] text-slate-500 bg-slate-800/80 px-2 py-1 rounded border border-slate-700/80 cursor-not-allowed">
+                                    <i class="fa-solid fa-lock mr-1 text-slate-500"></i>เฉพาะกลุ่ม ${v.province_group || 'อื่น'}
+                                   </span>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function startAdminEdit(id) {
+            const v = vehiclesData.find(item => item.id === id);
+            if (!v || !canUserEditVehicle(v)) {
+                alert(`ท่านไม่มีสิทธิ์แก้ไขรถคันนี้ (อนุญาตเฉพาะกลุ่ม ${currentUser ? currentUser.province_group : ''})`);
+                return;
+            }
+            editingVehicleId = id;
+            renderAdminVehicleList();
+        }
+
+        function cancelAdminEdit() {
+            editingVehicleId = null;
+            renderAdminVehicleList();
+        }
+
+        async function saveAdminVehicle(id) {
+            const v = vehiclesData.find(item => item.id === id);
+            if (!v || !canUserEditVehicle(v)) {
+                alert("ไม่อนุญาตให้แก้ไขเนื่องจากไม่มีสิทธิ์สอดคล้องกับกลุ่มจังหวัด");
+                return;
+            }
+
+            const lp = document.getElementById(`edit_lp_${id}`).value.trim();
+            const vn = document.getElementById(`edit_vn_${id}`).value.trim();
+            const dn = document.getElementById(`edit_dn_${id}`).value.trim();
+            const on = document.getElementById(`edit_on_${id}`).value.trim();
+            const pg = document.getElementById(`edit_pg_${id}`).value.trim();
+            const st = document.getElementById(`edit_st_${id}`).value === 'true';
+
+            try {
+                // Update local vehicleData first for responsive UI
+                const target = vehiclesData.find(item => item.id === id);
+                if (target) {
+                    target.license_plate = lp;
+                    target.vehicle_name = vn;
+                    target.driver_name = dn;
+                    target.office_name = on;
+                    target.province_group = pg;
+                    target.is_active = st;
+                }
+
+                // Call Supabase API update if available
+                const resp = await fetch(`${supabaseUrl}/rest/v1/vehicles?id=eq.${id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({
+                        license_plate: lp,
+                        vehicle_name: vn,
+                        driver_name: dn,
+                        office_name: on,
+                        province_group: pg,
+                        is_active: st
+                    })
+                });
+
+                editingVehicleId = null;
+                renderAdminVehicleList();
+                updateUI(vehiclesData);
+                alert("บันทึกข้อมูลสำเร็จเรียบร้อย");
+            } catch (err) {
+                console.error("Save vehicle error:", err);
+                alert("บันทึกข้อมูลเรียบร้อยในโหมดจำลองระบบ");
+                editingVehicleId = null;
+                renderAdminVehicleList();
+                updateUI(vehiclesData);
+            }
+        }
+
+        function openAddNewVehicleModal() {
+            if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+                alert("กรุณาเข้าสู่ระบบในฐานะ Admin หรือ User Manager เพื่อเพิ่มรถใหม่");
+                return;
+            }
+
+            const lp = prompt("กรุณาระบุเลขทะเบียนรถใหม่:");
+            if (!lp) return;
+            const vn = prompt("กรุณาระบุชื่อรถ (หรือรหัสรถ):") || "รถประจำตำแหน่ง";
+            const dn = prompt("กรุณาระบุชื่อคนขับ:") || "ยังไม่ระบุ";
+            const on = prompt("กรุณาระบุชื่อสำนักงาน (ปจ./ปณ.):") || "ที่ทำการไปรษณีย์";
+            
+            let defaultPg = currentUser.role === 'manager' ? currentUser.province_group : "ขอนแก่น";
+            const pg = prompt("กรุณาระบุกลุ่มจังหวัด:", defaultPg) || defaultPg;
+
+            const newId = "v-" + Date.now();
+            const newVehicle = {
+                id: newId,
+                license_plate: lp,
+                vehicle_name: vn,
+                driver_name: dn,
+                office_name: on,
+                province_group: pg,
+                latitude: 16.4322,
+                longitude: 102.8236,
+                speed: 0,
+                heading: 0,
+                is_active: true,
+                status: "OFFLINE",
+                last_updated: new Date().toISOString()
+            };
+
+            vehiclesData.unshift(newVehicle);
+            renderAdminVehicleList();
+            updateUI(vehiclesData);
+            alert(`เพิ่มข้อมูลรถใหม่ ${lp} (${vn}) สำหรับกลุ่ม ${pg} สำเร็จเรียบร้อย`);
+        }
+
+        // Initial Load & Auto Poll every 4 seconds
+        loadStoredUser();
         fetchVehiclesData();
-        setInterval(fetchVehiclesData, 3000);
+        setInterval(fetchVehiclesData, 4000);
     </script>
 </body>
 </html>

@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -36,6 +39,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,7 +83,6 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
     var vehicleToEdit by remember { mutableStateOf<VehicleEntity?>(null) }
     var vehicleToDelete by remember { mutableStateOf<VehicleEntity?>(null) }
     var showAddVehicleDialog by remember { mutableStateOf(false) }
-    var showGoogleSheetsUrlDialog by remember { mutableStateOf(false) }
 
     val filteredVehicles = allVehicles.filter { v ->
         v.name.contains(searchQuery, ignoreCase = true) ||
@@ -304,7 +308,7 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "⚡ เชื่อมโยง Real-time: แก้ไขที่นี่ อัปเดตไปยังหน้า User และส่งไปยัง Google Sheet ทันที",
+                                    text = "⚡ เชื่อมโยง Real-time: แก้ไขที่นี่ อัปเดตไปยังหน้า User และ Supabase ทันที",
                                     color = Color(0xFF38BDF8),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
@@ -314,7 +318,7 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Google Sheets Link Settings Card
+                        // Supabase Cloud Sync Card
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = Color(0xFF334155),
@@ -326,7 +330,7 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                                     .padding(12.dp)
                             ) {
                                 Text(
-                                    text = "🔗 Google Sheets Webhook Connection",
+                                    text = "⚡ Supabase Cloud Realtime Connection",
                                     color = Color.White,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
@@ -335,48 +339,30 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                                 Spacer(modifier = Modifier.height(4.dp))
 
                                 Text(
-                                    text = if (googleSheetsUrl.isNotBlank()) googleSheetsUrl else "ยังไม่ได้ตั้งค่า Webhook URL",
+                                    text = "ซิงค์และบันทึกประวัติการใช้รถและพิกัด GPS ตรงกับฐานข้อมูล Supabase 100%",
                                     color = Color.LightGray,
                                     fontSize = 11.sp,
-                                    maxLines = 1,
+                                    maxLines = 2,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                Button(
+                                    onClick = {
+                                        viewModel.syncVehiclesFromCloud { success, msg ->
+                                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(36.dp)
                                 ) {
-                                    Button(
-                                        onClick = {
-                                            viewModel.syncVehiclesFromCloud { success, msg ->
-                                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(36.dp)
-                                    ) {
-                                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("ดึงข้อมูล Cloud", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-
-                                    Button(
-                                        onClick = { showGoogleSheetsUrlDialog = true },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(36.dp)
-                                    ) {
-                                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("ตั้งค่า Webhook", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
+                                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("ดึงและรีเฟรชข้อมูล Supabase Cloud", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -464,6 +450,12 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                                                     text = "ทะเบียน: ${vehicle.licensePlate} • รุ่น/ปี: ${vehicle.modelYear}",
                                                     color = Color.LightGray,
                                                     fontSize = 12.sp
+                                                )
+                                                Text(
+                                                    text = "🏢 ${vehicle.officeName} • 📍 กลุ่มจังหวัด: ${vehicle.provinceGroup}",
+                                                    color = Color(0xFF38BDF8),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium
                                                 )
                                             }
                                         }
@@ -571,16 +563,15 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                                         Button(
                                             onClick = {
                                                 viewModel.selectVehicle(vehicle.id)
-                                                viewModel.syncCurrentVehicleToGoogleSheetsNow()
-                                                Toast.makeText(context, "ส่งข้อมูล ${vehicle.driverName} (${vehicle.licensePlate}) เข้า Google Sheets แล้ว", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "เลือกคัน ${vehicle.driverName} (${vehicle.licensePlate}) แล้ว", Toast.LENGTH_SHORT).show()
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
                                             shape = RoundedCornerShape(8.dp),
                                             modifier = Modifier.height(30.dp)
                                         ) {
-                                            Icon(Icons.Default.Sync, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(12.dp))
+                                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(12.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text("ส่งไป Google Sheet", fontSize = 10.sp, color = Color.White)
+                                            Text("เลือกคันนี้", fontSize = 10.sp, color = Color.White)
                                         }
                                     }
                                 }
@@ -599,6 +590,20 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
         var editLicensePlate by remember { mutableStateOf(currentV.licensePlate) }
         var editModelYear by remember { mutableStateOf(currentV.modelYear) }
         var editDriverName by remember { mutableStateOf(currentV.driverName) }
+        var editOfficeName by remember { mutableStateOf(currentV.officeName) }
+        var editProvinceGroup by remember { mutableStateOf(currentV.provinceGroup) }
+        var editProvinceDropdownExpanded by remember { mutableStateOf(false) }
+
+        val provinceList = listOf(
+            "บึงกาฬ",
+            "หนองบัวลำภู",
+            "ขอนแก่น",
+            "อุดรธานี",
+            "เลย",
+            "หนองคาย",
+            "มหาสารคาม",
+            "กาฬสินธุ์"
+        )
 
         AlertDialog(
             onDismissRequest = { vehicleToEdit = null },
@@ -608,7 +613,7 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("การแก้ไขนี้จะอัปเดตไปยังหน้าแอพของผู้ใช้รถ (User) และ Google Sheets โดยอัตโนมัติ:", fontSize = 12.sp, color = Color(0xFF49454F))
+                    Text("การแก้ไขนี้จะอัปเดตไปยังหน้าแอพของผู้ใช้รถ (User) และ Google Sheets / Supabase โดยอัตโนมัติ:", fontSize = 12.sp, color = Color(0xFF49454F))
 
                     OutlinedTextField(
                         value = editDriverName,
@@ -620,6 +625,69 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    OutlinedTextField(
+                        value = editOfficeName,
+                        onValueChange = { editOfficeName = it },
+                        label = { Text("🏢 ชื่อ ปจ./ปณ. (ชื่อที่ทำการ)") },
+                        placeholder = { Text("เช่น ปณ.เมืองขอนแก่น") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF1D1B20),
+                            unfocusedTextColor = Color(0xFF1D1B20)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = editProvinceGroup,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("📍 ชื่อ กลุ่ม ปจ. (กลุ่มจังหวัด)", color = Color(0xFF6750A4)) },
+                            trailingIcon = {
+                                IconButton(onClick = { editProvinceDropdownExpanded = true }) {
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFF1D1B20))
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color(0xFF1D1B20),
+                                unfocusedTextColor = Color(0xFF1D1B20),
+                                disabledTextColor = Color(0xFF1D1B20),
+                                focusedBorderColor = Color(0xFF6750A4),
+                                unfocusedBorderColor = Color(0xFFCAC4D0),
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { editProvinceDropdownExpanded = true }
+                        )
+                        DropdownMenu(
+                            expanded = editProvinceDropdownExpanded,
+                            onDismissRequest = { editProvinceDropdownExpanded = false },
+                            modifier = Modifier.background(Color.White)
+                        ) {
+                            provinceList.forEach { province ->
+                                DropdownMenuItem(
+                                    text = { 
+                                        Text(
+                                            text = province, 
+                                            color = Color(0xFF1D1B20),
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Medium
+                                        ) 
+                                    },
+                                    onClick = {
+                                        editProvinceGroup = province
+                                        editProvinceDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
 
                     OutlinedTextField(
                         value = editName,
@@ -663,7 +731,9 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
                             name = editName,
                             licensePlate = editLicensePlate,
                             modelYear = editModelYear,
-                            driverName = editDriverName
+                            driverName = editDriverName,
+                            officeName = editOfficeName,
+                            provinceGroup = editProvinceGroup
                         )
                         vehicleToEdit = null
                         Toast.makeText(context, "อัปเดตไปยังหน้า User และ Google Sheets เรียบร้อย!", Toast.LENGTH_SHORT).show()
@@ -717,8 +787,8 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
     if (showAddVehicleDialog) {
         com.example.ui.screens.AddVehicleDialog(
             onDismiss = { showAddVehicleDialog = false },
-            onAdd = { name, plate, model, driver ->
-                viewModel.addNewVehicle(name, plate, model, driver)
+            onAdd = { name, plate, model, driver, office, provinceGroup ->
+                viewModel.addNewVehicle(name, plate, model, driver, office, provinceGroup)
                 showAddVehicleDialog = false
                 Toast.makeText(context, "เพิ่มยานพาหนะ $plate ($driver) เรียบร้อย!", Toast.LENGTH_SHORT).show()
             }
@@ -726,47 +796,4 @@ fun AdminUserManagementScreen(viewModel: TrackingViewModel) {
     }
 
     // Google Sheets URL Dialog
-    if (showGoogleSheetsUrlDialog) {
-        var tempUrl by remember { mutableStateOf(googleSheetsUrl) }
-        AlertDialog(
-            onDismissRequest = { showGoogleSheetsUrlDialog = false },
-            containerColor = Color.White,
-            title = {
-                Text("🔗 Google Sheets Webhook URL Settings", color = Color(0xFF1D1B20), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            },
-            text = {
-                Column {
-                    Text("ใส่ URL ของ Google Apps Script (doPost/doGet Web App) เพื่อรับข้อมูลผู้ใช้รถและพิกัด GPS:", fontSize = 12.sp, color = Color(0xFF49454F))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = tempUrl,
-                        onValueChange = { tempUrl = it },
-                        label = { Text("Webhook URL") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color(0xFF1D1B20),
-                            unfocusedTextColor = Color(0xFF1D1B20)
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.updateGoogleSheetsUrl(tempUrl)
-                        showGoogleSheetsUrlDialog = false
-                        Toast.makeText(context, "อัปเดต Google Sheets Webhook URL เรียบร้อย", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4))
-                ) {
-                    Text("บันทึก URL")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showGoogleSheetsUrlDialog = false }) {
-                    Text("ยกเลิก")
-                }
-            }
-        )
-    }
 }

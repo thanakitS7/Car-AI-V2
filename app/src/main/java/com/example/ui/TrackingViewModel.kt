@@ -557,7 +557,14 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun addNewVehicle(name: String, licensePlate: String, modelYear: String, driverName: String = "") {
+    fun addNewVehicle(
+        name: String,
+        licensePlate: String,
+        modelYear: String,
+        driverName: String = "",
+        officeName: String = "",
+        provinceGroup: String = "ขอนแก่น"
+    ) {
         viewModelScope.launch {
             val newId = "V${System.currentTimeMillis() % 10000}"
             val vehicle = VehicleEntity(
@@ -574,10 +581,31 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                 batteryVoltage = 12.8,
                 activeRouteId = "R001",
                 isEngineLocked = false,
-                driverName = driverName.ifBlank { "สมชาย ใจดี (คนขับ)" }
+                driverName = driverName.ifBlank { "สมชาย ใจดี (คนขับ)" },
+                officeName = officeName.ifBlank { "ปณ.เมืองขอนแก่น" },
+                provinceGroup = provinceGroup.ifBlank { "ขอนแก่น" }
             )
             repository.addVehicle(vehicle)
             selectVehicle(newId)
+            
+            if (_isSupabaseSyncEnabled.value) {
+                com.example.util.SupabaseSyncManager.sendTelemetryToSupabase(
+                    baseUrl = _supabaseUrl.value,
+                    anonKey = _supabaseAnonKey.value,
+                    vehicleId = vehicle.id,
+                    vehicleName = vehicle.name,
+                    licensePlate = vehicle.licensePlate,
+                    driverName = vehicle.driverName,
+                    officeName = vehicle.officeName,
+                    provinceGroup = vehicle.provinceGroup,
+                    status = "NEW (เพิ่มยานพาหนะใหม่)",
+                    latitude = vehicle.currentLat,
+                    longitude = vehicle.currentLng,
+                    speedKmh = vehicle.speedKmh,
+                    fuelPercent = vehicle.fuelPercent,
+                    batteryVoltage = vehicle.batteryVoltage
+                )
+            }
         }
     }
 
@@ -590,7 +618,15 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun updateVehicleDetails(vehicleId: String, name: String, licensePlate: String, modelYear: String, driverName: String) {
+    fun updateVehicleDetails(
+        vehicleId: String,
+        name: String,
+        licensePlate: String,
+        modelYear: String,
+        driverName: String,
+        officeName: String = "",
+        provinceGroup: String = ""
+    ) {
         viewModelScope.launch {
             val vehicles = allVehicles.value
             val v = vehicles.firstOrNull { it.id == vehicleId } ?: return@launch
@@ -598,9 +634,29 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                 name = name.ifBlank { v.name },
                 licensePlate = licensePlate.ifBlank { v.licensePlate },
                 modelYear = modelYear.ifBlank { v.modelYear },
-                driverName = driverName.ifBlank { v.driverName }
+                driverName = driverName.ifBlank { v.driverName },
+                officeName = officeName.ifBlank { v.officeName },
+                provinceGroup = provinceGroup.ifBlank { v.provinceGroup }
             )
             repository.updateVehicle(updated)
+            if (_isSupabaseSyncEnabled.value) {
+                com.example.util.SupabaseSyncManager.sendTelemetryToSupabase(
+                    baseUrl = _supabaseUrl.value,
+                    anonKey = _supabaseAnonKey.value,
+                    vehicleId = updated.id,
+                    vehicleName = updated.name,
+                    licensePlate = updated.licensePlate,
+                    driverName = updated.driverName,
+                    officeName = updated.officeName,
+                    provinceGroup = updated.provinceGroup,
+                    status = "UPDATED (แก้ไขข้อมูลรถ)",
+                    latitude = updated.currentLat,
+                    longitude = updated.currentLng,
+                    speedKmh = updated.speedKmh,
+                    fuelPercent = updated.fuelPercent,
+                    batteryVoltage = updated.batteryVoltage
+                )
+            }
             if (_isGoogleSheetsSyncEnabled.value) {
                 com.example.util.GoogleSheetsSyncManager.sendTelemetryToGoogleSheets(
                     webhookUrl = _googleSheetsUrl.value,
@@ -608,6 +664,8 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                     vehicleName = updated.name,
                     licensePlate = updated.licensePlate,
                     driverName = updated.driverName,
+                    officeName = updated.officeName,
+                    provinceGroup = updated.provinceGroup,
                     status = "UPDATED (แก้ไขข้อมูลคนขับ/รถ)",
                     latitude = updated.currentLat,
                     longitude = updated.currentLng,
@@ -778,9 +836,10 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         val vehicle = activeVehicle.value ?: return
         viewModelScope.launch {
             _isSyncingInProcess.value = true
-            _lastSyncStatus.value = "กำลังส่งข้อมูลเข้า Google Sheets..."
-            val result = com.example.util.GoogleSheetsSyncManager.sendTelemetryToGoogleSheets(
-                webhookUrl = _googleSheetsUrl.value,
+            _lastSyncStatus.value = "กำลังส่งข้อมูลเข้า Supabase..."
+            val result = com.example.util.SupabaseSyncManager.sendTelemetryToSupabase(
+                baseUrl = com.example.util.SupabaseSyncManager.DEFAULT_SUPABASE_URL,
+                anonKey = com.example.util.SupabaseSyncManager.DEFAULT_ANON_KEY,
                 vehicleId = vehicle.id,
                 vehicleName = vehicle.name,
                 licensePlate = vehicle.licensePlate,
@@ -873,23 +932,7 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
                                 fuelPercent = currentVeh.fuelPercent,
                                 batteryVoltage = currentVeh.batteryVoltage
                             )
-                            _lastSyncStatus.value = sbResult.getOrElse { " Supabase: ${it.message}" }
-                        }
-
-                        if (_isGoogleSheetsSyncEnabled.value) {
-                            val result = com.example.util.GoogleSheetsSyncManager.sendTelemetryToGoogleSheets(
-                                webhookUrl = _googleSheetsUrl.value,
-                                vehicleId = currentVeh.id,
-                                vehicleName = currentVeh.name,
-                                licensePlate = currentVeh.licensePlate,
-                                driverName = currentVeh.driverName,
-                                status = currentVeh.status,
-                                latitude = targetPoint.lat,
-                                longitude = targetPoint.lng,
-                                speedKmh = targetSpeed,
-                                fuelPercent = currentVeh.fuelPercent,
-                                batteryVoltage = currentVeh.batteryVoltage
-                            )
+                            _lastSyncStatus.value = sbResult.getOrElse { "Supabase: ${it.message}" }
                         }
                     }
                 }

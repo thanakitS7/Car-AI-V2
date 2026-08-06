@@ -37,7 +37,9 @@ object GoogleSheetsSyncManager {
         speedKmh: Int,
         fuelPercent: Int,
         batteryVoltage: Double,
-        driverName: String = ""
+        driverName: String = "",
+        officeName: String = "",
+        provinceGroup: String = ""
     ): Result<String> = withContext(Dispatchers.IO) {
         val targetUrl = webhookUrl.ifBlank { DEFAULT_WEBHOOK_URL }
         val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
@@ -61,6 +63,16 @@ object GoogleSheetsSyncManager {
                 put("driver", driverName)
                 put("พนักงานขับรถ", driverName)
                 put("ชื่อผู้ใช้/พนักงานขับรถ", driverName)
+
+                put("officeName", officeName)
+                put("office_name", officeName)
+                put("ชื่อที่ทำการ", officeName)
+                put("ชื่อ ปจ./ปณ.", officeName)
+
+                put("provinceGroup", provinceGroup)
+                put("province_group", provinceGroup)
+                put("กลุ่มจังหวัด", provinceGroup)
+                put("ชื่อ กลุ่ม ปจ.", provinceGroup)
 
                 put("status", status)
                 put("สถานะ", status)

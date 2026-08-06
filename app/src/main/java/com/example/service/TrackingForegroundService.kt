@@ -22,7 +22,6 @@ import com.example.MainActivity
 import com.example.R
 import com.example.data.AppDatabase
 import com.example.data.TrackingRepository
-import com.example.util.GoogleSheetsSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -126,7 +125,7 @@ class TrackingForegroundService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("🚚 ระบบติดตาม GPS กำลังทำงานในภูมิหลัง")
-            .setContentText("บันทึกพิกัดและส่งขึ้น Google Sheets อยู่ตลอดเวลา แม้จะพักแอป")
+            .setContentText("ติดตามและส่งพิกัดรถขึ้น Supabase เรียลไทม์ แม้จะพักแอป")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -249,21 +248,6 @@ class TrackingForegroundService : Service() {
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
-
-                    // Google Sheets Sync
-                    GoogleSheetsSyncManager.sendTelemetryToGoogleSheets(
-                        webhookUrl = GoogleSheetsSyncManager.DEFAULT_WEBHOOK_URL,
-                        vehicleId = activeVehicle.id,
-                        vehicleName = activeVehicle.name,
-                        licensePlate = activeVehicle.licensePlate,
-                        driverName = activeVehicle.driverName,
-                        status = if (speedKmh > 3) "MOVING (GPS สดภูมิหลัง)" else "IDLE (จอดพักภูมิหลัง)",
-                        latitude = lat,
-                        longitude = lng,
-                        speedKmh = speedKmh,
-                        fuelPercent = activeVehicle.fuelPercent,
-                        batteryVoltage = activeVehicle.batteryVoltage
-                    )
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

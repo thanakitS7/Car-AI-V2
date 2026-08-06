@@ -107,20 +107,6 @@ fun AutoGuardApp() {
                         unselectedTextColor = Color(0xFF49454F)
                     )
                 )
-
-                NavigationBarItem(
-                    selected = selectedScreen == "ADMIN",
-                    onClick = { selectedScreen = "ADMIN" },
-                    icon = { Icon(imageVector = Icons.Default.ManageAccounts, contentDescription = "Admin") },
-                    label = { Text("จัดการข้อมูล", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.White,
-                        selectedTextColor = Color(0xFF6750A4),
-                        indicatorColor = Color(0xFF6750A4),
-                        unselectedIconColor = Color(0xFF49454F),
-                        unselectedTextColor = Color(0xFF49454F)
-                    )
-                )
             }
         }
     ) { innerPadding ->
@@ -129,7 +115,6 @@ fun AutoGuardApp() {
                 "LIVE_MAP" -> LiveTrackingScreen(viewModel = viewModel)
                 "ALERTS" -> AlertLogScreen(viewModel = viewModel)
                 "PLAYBACK" -> PlaybackScreen(viewModel = viewModel)
-                "ADMIN" -> AdminUserManagementScreen(viewModel = viewModel)
             }
         }
     }

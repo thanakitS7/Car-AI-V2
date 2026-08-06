@@ -39,7 +39,9 @@ object SupabaseSyncManager {
         speedKmh: Int,
         fuelPercent: Int,
         batteryVoltage: Double,
-        driverName: String = ""
+        driverName: String = "",
+        officeName: String = "",
+        provinceGroup: String = ""
     ): Result<String> = withContext(Dispatchers.IO) {
         val cleanedUrl = baseUrl.trim().removeSuffix("/").removeSuffix("/rest/v1")
         val timeStr = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
@@ -50,6 +52,8 @@ object SupabaseSyncManager {
                 put("vehicle_name", vehicleName)
                 put("license_plate", licensePlate)
                 put("driver_name", driverName)
+                put("office_name", officeName)
+                put("province_group", provinceGroup)
                 put("status", status)
                 put("speed_kmh", speedKmh)
                 put("latitude", latitude)
