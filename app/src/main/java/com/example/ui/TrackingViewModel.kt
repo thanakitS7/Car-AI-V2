@@ -26,6 +26,9 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
+
 class TrackingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getDatabase(application)
@@ -138,7 +141,10 @@ class TrackingViewModel(application: Application) : AndroidViewModel(application
         initialValue = "V001"
     )
 
-    val activeHistoryPoints = repository.getLocationHistory("V001").stateIn(
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val activeHistoryPoints = _selectedVehicleId.flatMapLatest { id ->
+        repository.getLocationHistory(id)
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
